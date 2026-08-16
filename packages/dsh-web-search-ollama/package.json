@@ -1,9 +1,10 @@
 {
   "name": "dsh-web-search-ollama",
   "version": "0.1.0",
-  "description": "Ollama-backed search & fetch provider for the DeepSeek Harness ctx.web seam (host half of the web-search-ollama plugin)",
+  "description": "Ollama-backed search & fetch provider for the DeepSeek Harness `ctx.web` seam (host half of the web-search-ollama plugin)",
   "type": "module",
   "main": "index.js",
+  "types": "./src/index.ts",
   "exports": {
     ".": "./index.js",
     "./package.json": "./package.json",
@@ -31,11 +32,25 @@
     "web-search",
     "ollama"
   ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "scripts": {
+    "build": "tsc --outDir . --esModuleInterop --target es2020 --module commonjs --skipLibCheck",
+    "prepare": "npm run build"
+  },
   "peerDependencies": {
     "@deepseek-ai/dsh-settings": "^0.1.0-rc.6",
     "@deepseek-ai/dsh-web": "^0.1.0-rc.6"
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "^3.18.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "@deepseek-ai/cordis": "^4.0.1"
   }
 }
