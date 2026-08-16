@@ -1,0 +1,17 @@
+{
+  "name": "dsh-web-search-ollama-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Ollama-backed web search & fetch provider for DeepSeek Harness — monorepo of the host and client halves",
+  "type": "module",
+  "scripts": {
+    "test": "node packages/dsh-web-search-ollama/test.mjs",
+    "install:profile": "bash scripts/install.sh"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@deepseek-ai/dsh-settings": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-web": "^0.1.0-rc.6",
+    "@deepseek-ai/schemastery": "^3.18.1"
+  }
+}

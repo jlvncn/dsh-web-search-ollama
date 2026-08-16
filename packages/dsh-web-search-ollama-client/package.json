@@ -1,0 +1,40 @@
+{
+  "name": "dsh-web-search-ollama-client",
+  "version": "0.1.0",
+  "description": "Browser half for dsh-web-search-ollama: registers the plugin configuration card in the DeepSeek Harness Web UI settings page",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js"
+  ],
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jlvncn/dsh-web-search-ollama.git"
+  },
+  "homepage": "https://github.com/jlvncn/dsh-web-search-ollama#readme",
+  "bugs": {
+    "url": "https://github.com/jlvncn/dsh-web-search-ollama/issues"
+  },
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "plugin",
+    "settings",
+    "ollama"
+  ],
+  "dsh": {
+    "client": {
+      "platform": "web"
+    }
+  }
+}

@@ -1,0 +1,35 @@
+# ---- Dependencies -----------------------------------------------------------
+# node_modules contains a dev-only symlink (@deepseek-ai -> the DSH profile's
+# hoisted deps). Never commit it — clone with `pnpm install` instead.
+node_modules/
+
+# ---- macOS ------------------------------------------------------------------
+.DS_Store
+.DS_Store?*
+._*
+.Spotlight-V100
+.Trashes
+
+# ---- Logs -------------------------------------------------------------------
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ---- Editor / IDE -----------------------------------------------------------
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.zed/
+
+# ---- Backup / temp files ----------------------------------------------------
+*.bak
+*.bak.*
+*.orig
+*.tmp
+tmp/
+temp/

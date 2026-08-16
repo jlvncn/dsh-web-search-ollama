@@ -1,0 +1,46 @@
+# =============================================================================
+# dsh-web-search-ollama — loader patch for a DeepSeek Harness profile
+#
+# Merge this file's entries into your profile's cordis.patch.yml
+# ($DSH_HOME/profiles/<profile>/cordis.patch.yml), or let scripts/install.sh
+# do it for you. The two halves below are BOTH required:
+#
+#   web-search-ollama          host half   — registers the Ollama search &
+#                                            fetch providers on ctx.web
+#   web-search-ollama-client   client half — registers the configuration
+#                                            card in the Web UI settings page
+#                                            (must be a package name so the
+#                                            client-modules scanner finds it)
+#
+# Requires the two packages to be installed under the profile's node_modules:
+#   $DSH_HOME/profiles/node_modules/dsh-web-search-ollama/
+#   $DSH_HOME/profiles/node_modules/dsh-web-search-ollama-client/
+# =============================================================================
+
+# Use the Ollama-backed search provider instead of the built-in DeepSeek one.
+- id: web
+  config:
+    searchProvider: ollama
+
+# The built-in DeepSeek search provider is replaced; keep it disabled.
+- id: web-search-deepseek
+  disabled: true
+
+- insert:
+    # Host half: Ollama-backed search & fetch provider. Mounted as a package
+    # name (resolvable from the profile's node_modules) so the loader
+    # inventory shows a proper name instead of a raw file path.
+    - id: web-search-ollama
+      name: 'dsh-web-search-ollama'
+      config:
+        baseURL: https://ollama.com
+        searchPath: /api/web_search
+        fetchPath: /api/web_fetch
+        apiKeyEnv: OLLAMA_API_KEY
+
+    # Browser half: registers the "web-search-ollama" card in the Web UI
+    # plugin-configuration tab. Must be mounted as a package name (resolvable
+    # from the profile's node_modules) for the client-modules scanner to
+    # discover its client bundle.
+    - id: web-search-ollama-client
+      name: 'dsh-web-search-ollama-client'

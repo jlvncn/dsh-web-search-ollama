@@ -1,0 +1,41 @@
+{
+  "name": "dsh-web-search-ollama",
+  "version": "0.1.0",
+  "description": "Ollama-backed search & fetch provider for the DeepSeek Harness ctx.web seam (host half of the web-search-ollama plugin)",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./package.json": "./package.json",
+    "./src/*": "./src/*"
+  },
+  "files": [
+    "index.js"
+  ],
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jlvncn/dsh-web-search-ollama.git"
+  },
+  "homepage": "https://github.com/jlvncn/dsh-web-search-ollama#readme",
+  "bugs": {
+    "url": "https://github.com/jlvncn/dsh-web-search-ollama/issues"
+  },
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "plugin",
+    "web-search",
+    "ollama"
+  ],
+  "peerDependencies": {
+    "@deepseek-ai/dsh-settings": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-web": "^0.1.0-rc.6"
+  },
+  "dependencies": {
+    "@deepseek-ai/schemastery": "^3.18.1"
+  }
+}
