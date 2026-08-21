@@ -7,6 +7,12 @@
 ### Changed
 
 - 审计事件 `web/deepseek-search-llm-request` 的载荷补充 `apiVersion` 字段（默认 `v1`），与官方 `DeepSeekSearchLlmRequest` 事件形状对齐（`endpoint` / `apiVersion` / `body`）。
+- `apiVersion` 变为可配置字段（host `Config` schema + Web UI 配置卡片第 8 个字段，默认 `v1`；Ollama 无版本头，仅作为审计标签）。
+- 凭证缺失时抛出 `WEB_PROVIDER_CREDENTIAL_MISSING`（附带缺失的环境变量名与配置指引），不再静默发送无鉴权请求。
+- `available()` 增强：校验 `baseURL` 可解析（`new URL` 可构造）且数值配置为正整数。
+- HTTP 非 2xx 时尝试解析响应体并透出 provider 自身的错误详情（解析失败回退到通用状态码消息，对 Ollama 不同错误形状保持防御）。
+- search 响应缺失/非数组 `results` 时报 `WEB_PROVIDER_ERROR`（空数组仍视为合法「无结果」）。
+- 补齐取消语义：请求前检查 `signal`、凭证解析可取消（`abortable`）、`isAbortError`（DOMException AbortError）识别为 `WEB_ABORTED`。
 
 ### Fixed
 

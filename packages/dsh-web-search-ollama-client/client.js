@@ -75,6 +75,8 @@ window.__ModuleLoader__.load({
       searchPathHint: "POST 搜索端点路径。",
       fetchPath: "抓取路径",
       fetchPathHint: "POST 抓取端点路径。",
+      apiVersion: "API 版本",
+      apiVersionHint: "审计事件中的 API 版本标签（Ollama 无版本头，默认 v1）。",
       snippetMax: "摘要上限（字符）",
       snippetMaxHint: "每条搜索结果的 content 截断长度。",
       fetchTimeoutMs: "抓取超时（毫秒）",
@@ -104,6 +106,8 @@ window.__ModuleLoader__.load({
       searchPathHint: "POST search endpoint path.",
       fetchPath: "Fetch path",
       fetchPathHint: "POST fetch endpoint path.",
+      apiVersion: "API version",
+      apiVersionHint: "Version label recorded in audit events (Ollama has no version header; default v1).",
       snippetMax: "Snippet cap (chars)",
       snippetMaxHint: "Truncated content length per search result.",
       fetchTimeoutMs: "Fetch timeout (ms)",
@@ -127,6 +131,7 @@ window.__ModuleLoader__.load({
       { key: "apiKeyEnv", label: "apiKeyEnv", type: "text" },
       { key: "searchPath", label: "searchPath", type: "text", placeholder: "/api/web_search" },
       { key: "fetchPath", label: "fetchPath", type: "text", placeholder: "/api/web_fetch" },
+      { key: "apiVersion", label: "apiVersion", type: "text", placeholder: "v1" },
       { key: "snippetMax", label: "snippetMax", type: "number" },
       { key: "fetchTimeoutMs", label: "fetchTimeoutMs", type: "number" }
     ];
@@ -136,6 +141,7 @@ window.__ModuleLoader__.load({
       baseURL: "baseURLHint",
       searchPath: "searchPathHint",
       fetchPath: "fetchPathHint",
+      apiVersion: "apiVersionHint",
       snippetMax: "snippetMaxHint",
       fetchTimeoutMs: "fetchTimeoutMsHint"
     };
