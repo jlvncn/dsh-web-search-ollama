@@ -2,6 +2,12 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [Unreleased]
+
+### Changed
+
+- 审计事件 `web/deepseek-search-llm-request` 的载荷补充 `apiVersion` 字段（默认 `v1`），与官方 `DeepSeekSearchLlmRequest` 事件形状对齐（`endpoint` / `apiVersion` / `body`）。
+
 ## [0.1.0] - 2026-08-16
 
 首次发布。将 DeepSeek Harness 的联网搜索能力切换到 **Ollama 云端 API**（`/api/web_search` + `/api/web_fetch`），并在 Web GUI 提供可视化配置卡片。

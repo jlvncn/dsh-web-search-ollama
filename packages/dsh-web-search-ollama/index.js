@@ -16,6 +16,7 @@ const DEFAULT_SEARCH_PATH = '/api/web_search';
 const DEFAULT_FETCH_PATH = '/api/web_fetch';
 const DEFAULT_SNIPPET_MAX = 2000;
 const DEFAULT_FETCH_TIMEOUT_MS = 15000;
+const DEFAULT_API_VERSION = 'v1';
 const ConfigSchema = schemastery_1.default.object({
     apiKey: schemastery_1.default.string().role('secret'),
     apiKeyEnv: schemastery_1.default.string().role('credential-ref').default(DEFAULT_API_KEY_ENV),
@@ -90,7 +91,7 @@ class OllamaSearchProvider {
         if (request.maxResults != null && typeof request.maxResults === 'number' && request.maxResults > 0) {
             payload.max_results = Math.min(request.maxResults, 10);
         }
-        o.recordRequest?.({ endpoint, body: payload });
+        o.recordRequest?.({ endpoint, apiVersion: DEFAULT_API_VERSION, body: payload });
         let response;
         try {
             response = await fetch(endpoint, {
@@ -160,7 +161,7 @@ class OllamaFetchProvider {
         const apiKey = await o.resolveApiKey();
         const endpoint = `${o.baseURL.replace(/\/+$/, '')}${o.fetchPath}`;
         const payload = { url: request.url };
-        o.recordRequest?.({ endpoint, body: payload });
+        o.recordRequest?.({ endpoint, apiVersion: DEFAULT_API_VERSION, body: payload });
         let abortSignal = undefined;
         if (signal !== undefined) {
             abortSignal = signal;

@@ -9,7 +9,11 @@
 // NOTE: full search/fetch behavior is exercised in-profile, not here.
 let plugin, Config;
 try {
-  ({ default: plugin, Config } = await import('./index.js'));
+  const ns = await import('./index.js');
+  // CJS build: `default` is `module.exports` ({ Config, default: plugin });
+  // ESM build: `default` is the plugin itself. Accept both shapes.
+  plugin = ns.default?.default ?? ns.default;
+  Config = ns.Config ?? ns.default?.Config;
 } catch (error) {
   console.error('FAIL: cannot load the plugin module:', error.message);
   console.error('      Run `pnpm install` in the monorepo root, or run this');

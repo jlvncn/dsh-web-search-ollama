@@ -42,6 +42,8 @@ const DEFAULT_SEARCH_PATH = '/api/web_search';
 const DEFAULT_FETCH_PATH = '/api/web_fetch';
 const DEFAULT_SNIPPET_MAX = 2000;
 const DEFAULT_FETCH_TIMEOUT_MS = 15000;
+/** API generation label recorded in the audit event payload (Ollama has no version header). */
+const DEFAULT_API_VERSION = 'v1';
 
 const ConfigSchema = Schema.object({
   /** Literal API key; wins over `apiKeyEnv`. Never rides a describe() response. */
@@ -138,7 +140,7 @@ class OllamaSearchProvider implements WebSearchProvider {
       // Ollama: max_results default 5, max 10 — the seam truncates regardless.
       payload.max_results = Math.min(request.maxResults, 10);
     }
-    o.recordRequest?.({ endpoint, body: payload });
+    o.recordRequest?.({ endpoint, apiVersion: DEFAULT_API_VERSION, body: payload });
     let response: Response;
     try {
       response = await fetch(endpoint, {
@@ -205,7 +207,7 @@ class OllamaFetchProvider implements WebFetchProvider {
     const apiKey = await o.resolveApiKey();
     const endpoint = `${o.baseURL.replace(/\/+$/, '')}${o.fetchPath}`;
     const payload: Record<string, any> = { url: request.url };
-    o.recordRequest?.({ endpoint, body: payload });
+    o.recordRequest?.({ endpoint, apiVersion: DEFAULT_API_VERSION, body: payload });
     // Combine abort signals: user signal + timeout
     let abortSignal: AbortSignal | undefined = undefined;
     if (signal !== undefined) {
