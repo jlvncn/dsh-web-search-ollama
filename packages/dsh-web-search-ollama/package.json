@@ -2,6 +2,7 @@
   "name": "dsh-web-search-ollama",
   "version": "0.1.0",
   "description": "Ollama-backed search & fetch provider for the DeepSeek Harness `ctx.web` seam (host half of the web-search-ollama plugin)",
+  "type": "module",
   "main": "index.js",
   "types": "./src/index.ts",
   "exports": {
@@ -37,7 +38,7 @@
     }
   },
   "scripts": {
-    "build": "tsc --outDir . --esModuleInterop --target es2020 --module commonjs --skipLibCheck",
+    "build": "tsc --outDir . --esModuleInterop --target es2020 --module esnext --skipLibCheck",
     "prepare": "npm run build"
   },
   "peerDependencies": {

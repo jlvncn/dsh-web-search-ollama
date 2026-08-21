@@ -1,15 +1,9 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.Config = void 0;
-const schemastery_1 = __importDefault(require("@deepseek-ai/schemastery"));
-const dsh_settings_1 = require("@deepseek-ai/dsh-settings");
-const dsh_web_1 = require("@deepseek-ai/dsh-web");
+import Schema from '@deepseek-ai/schemastery';
+import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings';
+import { WebError } from '@deepseek-ai/dsh-web';
 const name = 'web-search-ollama';
 const inject = ['web'];
-const NS = (0, dsh_settings_1.settingsNamespace)('web-search-ollama');
+const NS = settingsNamespace('web-search-ollama');
 const DEFAULT_API_KEY_ENV = 'OLLAMA_API_KEY';
 const DEFAULT_BASE_URL = 'https://ollama.com';
 const DEFAULT_SEARCH_PATH = '/api/web_search';
@@ -17,16 +11,15 @@ const DEFAULT_FETCH_PATH = '/api/web_fetch';
 const DEFAULT_SNIPPET_MAX = 2000;
 const DEFAULT_FETCH_TIMEOUT_MS = 15000;
 const DEFAULT_API_VERSION = 'v1';
-const ConfigSchema = schemastery_1.default.object({
-    apiKey: schemastery_1.default.string().role('secret'),
-    apiKeyEnv: schemastery_1.default.string().role('credential-ref').default(DEFAULT_API_KEY_ENV),
-    baseURL: schemastery_1.default.string().default(DEFAULT_BASE_URL),
-    searchPath: schemastery_1.default.string().default(DEFAULT_SEARCH_PATH),
-    fetchPath: schemastery_1.default.string().default(DEFAULT_FETCH_PATH),
-    snippetMax: schemastery_1.default.number().step(1).min(1).default(DEFAULT_SNIPPET_MAX),
-    fetchTimeoutMs: schemastery_1.default.number().step(1).min(1).default(DEFAULT_FETCH_TIMEOUT_MS),
+const ConfigSchema = Schema.object({
+    apiKey: Schema.string().role('secret'),
+    apiKeyEnv: Schema.string().role('credential-ref').default(DEFAULT_API_KEY_ENV),
+    baseURL: Schema.string().default(DEFAULT_BASE_URL),
+    searchPath: Schema.string().default(DEFAULT_SEARCH_PATH),
+    fetchPath: Schema.string().default(DEFAULT_FETCH_PATH),
+    snippetMax: Schema.number().step(1).min(1).default(DEFAULT_SNIPPET_MAX),
+    fetchTimeoutMs: Schema.number().step(1).min(1).default(DEFAULT_FETCH_TIMEOUT_MS),
 });
-exports.Config = ConfigSchema;
 function resolveOptions(ctx, config) {
     const apiKeyEnv = config.apiKeyEnv ?? DEFAULT_API_KEY_ENV;
     return {
@@ -104,11 +97,11 @@ class OllamaSearchProvider {
         catch (error) {
             const err = error;
             if (signal?.aborted === true)
-                throw new dsh_web_1.WebError('Ollama web search aborted', 'WEB_ABORTED', { cause: err });
-            throw new dsh_web_1.WebError(`Ollama web search request failed: ${String(err)}`, 'WEB_PROVIDER_ERROR', { cause: err });
+                throw new WebError('Ollama web search aborted', 'WEB_ABORTED', { cause: err });
+            throw new WebError(`Ollama web search request failed: ${String(err)}`, 'WEB_PROVIDER_ERROR', { cause: err });
         }
         if (!response.ok) {
-            throw new dsh_web_1.WebError(`Ollama web search API error (HTTP ${response.status})`, 'WEB_PROVIDER_ERROR');
+            throw new WebError(`Ollama web search API error (HTTP ${response.status})`, 'WEB_PROVIDER_ERROR');
         }
         let body;
         try {
@@ -116,7 +109,7 @@ class OllamaSearchProvider {
         }
         catch (error) {
             const err = error;
-            throw new dsh_web_1.WebError('Ollama web search returned an unprocessable response body', 'WEB_PROVIDER_ERROR', { cause: err });
+            throw new WebError('Ollama web search returned an unprocessable response body', 'WEB_PROVIDER_ERROR', { cause: err });
         }
         const items = Array.isArray(body?.results) ? body.results : [];
         const seen = new Set();
@@ -185,13 +178,13 @@ class OllamaFetchProvider {
         catch (error) {
             const err = error;
             if (abortSignal?.aborted === true)
-                throw new dsh_web_1.WebError('Ollama web fetch aborted', 'WEB_ABORTED', { cause: err });
+                throw new WebError('Ollama web fetch aborted', 'WEB_ABORTED', { cause: err });
             if (err instanceof Error && err.name === 'TimeoutError')
-                throw new dsh_web_1.WebError(`Ollama web fetch timed out after ${o.fetchTimeoutMs}ms`, 'WEB_PROVIDER_ERROR', { cause: err });
-            throw new dsh_web_1.WebError(`Ollama web fetch request failed: ${String(err)}`, 'WEB_PROVIDER_ERROR', { cause: err });
+                throw new WebError(`Ollama web fetch timed out after ${o.fetchTimeoutMs}ms`, 'WEB_PROVIDER_ERROR', { cause: err });
+            throw new WebError(`Ollama web fetch request failed: ${String(err)}`, 'WEB_PROVIDER_ERROR', { cause: err });
         }
         if (!response.ok) {
-            throw new dsh_web_1.WebError(`Ollama web fetch API error (HTTP ${response.status})`, 'WEB_PROVIDER_ERROR');
+            throw new WebError(`Ollama web fetch API error (HTTP ${response.status})`, 'WEB_PROVIDER_ERROR');
         }
         let body;
         try {
@@ -199,7 +192,7 @@ class OllamaFetchProvider {
         }
         catch (error) {
             const err = error;
-            throw new dsh_web_1.WebError('Ollama web fetch returned an unprocessable response body', 'WEB_PROVIDER_ERROR', { cause: err });
+            throw new WebError('Ollama web fetch returned an unprocessable response body', 'WEB_PROVIDER_ERROR', { cause: err });
         }
         const content = typeof body?.content === 'string' ? body.content : '';
         const finalUrl = response.url != null && response.url !== endpoint ? response.url : request.url;
@@ -214,11 +207,12 @@ class OllamaFetchProvider {
 }
 function apply(ctx, config) {
     let current = () => config;
-    (0, dsh_settings_1.installSettingsSection)(ctx, NS, ConfigSchema, config, {
+    installSettingsSection(ctx, NS, ConfigSchema, config, {
         setSource: (source) => { current = source; },
         onChange: () => { },
     });
     ctx.web.registerSearchProvider(new OllamaSearchProvider(() => resolveOptions(ctx, current())));
     ctx.web.registerFetchProvider(new OllamaFetchProvider(() => resolveOptions(ctx, current())));
 }
-exports.default = { name, inject, apply };
+export { ConfigSchema as Config };
+export default { name, inject, apply };
