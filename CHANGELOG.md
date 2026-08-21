@@ -11,6 +11,7 @@
 ### Fixed
 
 - host 包改为 **ESM 构建**（`type: module` + `tsc --module esnext`），修复此前 CJS 构建产物在 DSH loader 并发加载依赖时抛出 `ERR_REQUIRE_ESM_RACE_CONDITION` 导致 `dsh web` 启动崩溃的问题。
+- client 包注册 `settings.plugin.item` 槽时补充 `key: "web-search-ollama"`。该槽由官方声明为 `kind: "keyed"`，缺失 `key` 会导致浏览器端 keyed-slot 错误、配置卡片渲染崩溃。
 
 ## [0.1.0] - 2026-08-16
 

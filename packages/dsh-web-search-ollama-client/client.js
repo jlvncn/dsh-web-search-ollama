@@ -301,6 +301,7 @@ window.__ModuleLoader__.load({
         return ctx.slots.register({
           name: "settings.plugin.item",
           id: "web-search-ollama",
+          key: "web-search-ollama",   // settings.plugin.item is a keyed slot; key = namespace
           order: 30,
           locale: NS,
           inject: function () { return { hooks: {} }; }
