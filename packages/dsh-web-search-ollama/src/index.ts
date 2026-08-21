@@ -104,7 +104,7 @@ function resolveOptions(ctx: Context, config: Config): ResolveOptions {
       : DEFAULT_FETCH_TIMEOUT_MS,
     recordRequest: (payload) => {
       try {
-        ctx.get('agents')?.currentInitiator()?.session?.append?.('web/ollama-search-request', payload);
+        ctx.get('agents')?.currentInitiator()?.session?.append?.('web/deepseek-search-llm-request', payload);
       } catch { /* best-effort audit logging */ }
     },
   };

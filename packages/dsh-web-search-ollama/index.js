@@ -57,7 +57,7 @@ function resolveOptions(ctx, config) {
             : DEFAULT_FETCH_TIMEOUT_MS,
         recordRequest: (payload) => {
             try {
-                ctx.get('agents')?.currentInitiator()?.session?.append?.('web/ollama-search-request', payload);
+                ctx.get('agents')?.currentInitiator()?.session?.append?.('web/deepseek-search-llm-request', payload);
             }
             catch { }
         },
