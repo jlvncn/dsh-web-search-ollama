@@ -46,6 +46,8 @@ dsh-web-search-ollama/
 
 ## 快速开始
 
+> **环境要求**：Node.js **>= 20.3**（host 包用到了 `AbortSignal.any()` 与 `AbortSignal.timeout()`，`AbortSignal.any` 自 Node 20.3 起才可用）。请先确认 `node --version`。
+
 ### 1. 安装（三选一）
 
 **方式 A — 一键脚本（推荐，无需网络）**

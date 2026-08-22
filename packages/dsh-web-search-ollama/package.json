@@ -4,7 +4,7 @@
   "description": "Ollama-backed search & fetch provider for the DeepSeek Harness `ctx.web` seam (host half of the web-search-ollama plugin)",
   "type": "module",
   "engines": {
-    "node": ">=18.17.0"
+    "node": ">=20.3.0"
   },
   "main": "index.js",
   "types": "./src/index.ts",
