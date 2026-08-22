@@ -16,6 +16,7 @@
 
 ### Fixed
 
+- client 包设置卡片对 `scope.load()` 的调用改为 `typeof scope.load === "function"` 守护（`useEffect` 初始化与 `onSave` 成功处），修复 `settingsScope` 在当前运行环境下未暴露 `load` 方法时抛出 `TypeError: scope.load is not a function`、导致设置卡片整体崩溃不渲染的问题。
 - host 包改为 **ESM 构建**（`type: module` + `tsc --module esnext`），修复此前 CJS 构建产物在 DSH loader 并发加载依赖时抛出 `ERR_REQUIRE_ESM_RACE_CONDITION` 导致 `dsh web` 启动崩溃的问题。
 - client 包注册 `settings.plugin.item` 槽时补充 `key: "web-search-ollama"`。该槽由官方声明为 `kind: "keyed"`，缺失 `key` 会导致浏览器端 keyed-slot 错误、配置卡片渲染崩溃。
 
