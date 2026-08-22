@@ -171,6 +171,7 @@ pnpm test             # 模块形状测试（packages/dsh-web-search-ollama/test
 | 配置页卡片显示"设置命名空间不可用" | `settings.describe` 里没有 `web-search-ollama` → host 包未 apply（检查 `pluginInventory.list` 中 `web-search-ollama` 是否 active / failed） |
 | 改了 client.js 页面没变化 | 刷新页面（`serveBundle` 每次读取磁盘，`cache-control: no-cache`；不必重启 dsh） |
 | 插件列表出现两个 ollama 条目 | 正常：host + client 两个 half，见上文「架构」 |
+| **macOS 上用云端 `https://ollama.com` 搜索超时 / `UND_ERR_CONNECT_TIMEOUT`，但 `nslookup` 正常** | 本机 `getaddrinfo` 对该域名的缓存异常（某些网络环境会恰好卡 ~30s）。执行 `sudo dscacheutil -flushcache && sudo killall -HUP mDNSResponder` 即可（仅清空本地 DNS 缓存，安全可逆，无需改 `/etc/hosts`）。若反复出现，建议改用自建 Ollama（`baseURL` 填 `http://localhost:11434`） |
 
 ## License
 
