@@ -39,6 +39,7 @@
 ### Fixed
 
 - 第三方插件 settings 命名空间无法暴露到 Web UI（`dsh-host-apiproxy` 白名单缺 `web-search-ollama`）→ 补白名单。
+  > 注：该补丁仅针对当时的 dsh 版本（0.1.0-rc.x 硬编码白名单时代）。dsh 0.1.1-rc.2 起 settings 暴露已重构为动态枚举运行时注册表（`settings.describe` = `[...this.registrations.values()]`），任何经 `installSettingsSection` 注册的第三方命名空间自动对 Web UI 可见，**不再需要任何补丁**。
 - `settings.yaml` 空节（`key:` 无值 = YAML `null`）导致 `settings.register()` 抛 `TypeError`、配置节静默注册失败 → 改用 `{}` 空对象。
 - 配置卡片注册成功但无法折叠（自绘卡片缺少可折叠交互）→ 对齐官方 `PluginCard` 模式。
 - 插件列表显示原始文件路径 `./ollama-search.mjs` → host 插件发布为正式包，显示 `web-search-ollama`。
