@@ -116,9 +116,21 @@ function apply(ctx, config) {
 
 ### 5.3 功能实测
 - [ ] 搜索：`searchProvider: ollama` 生效（发起一次联网提问，命中 `/api/web_search`）
-- [ ] 抓取：fetchProvider 走 `/api/web_fetch` 正常返回正文
+- [ ] 抓取（插件路径）：`fetchProvider: ollama` 时走 `/api/web_fetch` 正常返回正文
+- [ ] 抓取（内置 http，2026-09-05 补）：`fetchProvider: http` 时 `web_fetch` 任意公网 URL 正常返回（如 `fetch http://example.com`）
 - [ ] 凭证两路：`OLLAMA_API_KEY` 环境变量 / credentials 均能解析；无 key 时报 `WEB_PROVIDER_CREDENTIAL_MISSING`
 - [ ] 审计事件：会话记录含 `web/deepseek-search-llm-request` 且**重启后可加载**（0.1.2 session 重构后重点验）
+
+> ⚠️ **多 provider 冲突坑（2026-09-05 实测，务必写入复验）**：本插件 host 半会同时注册
+> **搜索 provider 与抓取 provider（id 均为 `ollama`）**。若 `cordis.patch.yml` 只固定
+> `searchProvider: ollama` 而未固定 `fetchProvider`，则抓取侧同时存在两个可用 provider
+> （内置 `http` + 插件 `ollama`），`web_fetch` 会直接报
+> `multiple usable web providers are registered (http, ollama); configure one explicitly`
+> 而拒绝执行。**此类配置层冲突不会在加载期报错，只在运行时调用工具才暴露**，
+> 因此升级复验必须包含一次真实的 `web_fetch` 调用（不能只验证搜索）。
+> 当前方案：`searchProvider: ollama` + `fetchProvider: http`（搜索走 Ollama、抓取走内置通用 http）；
+> 若希望抓取也走 Ollama 则改 `fetchProvider: ollama`（需 `/api/web_fetch` + key 可达）。
+> 补充环境变量等价物：`$DSH_WEB_SEARCH_PROVIDER` / `$DSH_WEB_FETCH_PROVIDER`。
 
 ### 5.4 回归
 - [ ] 取消语义：中断请求不残留、错误归类正常
