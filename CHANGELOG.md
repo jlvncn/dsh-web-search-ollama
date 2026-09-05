@@ -2,6 +2,19 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [0.1.4] - 2026-09-05
+
+修复 host 半同时注册搜索/抓取 provider 导致的 **web_fetch 多 provider 冲突**，并沉淀升级评估文档。
+
+### Fixed
+
+- **web_fetch 不可用（多 provider 冲突）**：host 半在 `ctx.web` 上同时注册搜索与抓取 provider（id 均为 `ollama`）。示例补丁（`profile/cordis.patch.yml`）此前只固定 `searchProvider: ollama` 而未固定 `fetchProvider`，导致抓取侧同时存在内置 `http` 与插件 `ollama` 两个可用 provider，`web_fetch` 报 `multiple usable web providers are registered (http, ollama); configure one explicitly` 并拒绝执行。现补丁固定 `fetchProvider: http`（搜索走 Ollama、抓取走内置通用 http；如需抓取也走 Ollama 可改为 `fetchProvider: ollama`，需 `/api/web_fetch` + key 可达）。
+
+### Added
+
+- **`UPGRADE_EVALUATION_GUIDE.md`**：DSH 版本升级评估通用流程（依赖链审计、API 用法映射、验证计划）。验证计划明确要求**运行时真实调用 `web_fetch` + `web_search`**——配置层冲突只在工具被调用时才暴露，加载期不会报错。
+- 升级影响评估文档（`docs/dsh-upgrade-0.1.2-impact.md`）§5.3 补充内置 http 抓取复验项与多 provider 冲突警示。
+
 ## [0.1.3] - 2026-09-05
 
 彻底切换到 DSH 0.1.2 API，**不再兼容 0.1.1 及更早**（旧版本 v0.1.0/v0.1.1/v0.1.2 的 tag 与 release 均保留，可回退）。
@@ -71,6 +84,7 @@
 - 默认联网搜索从内置 DeepSeek 搜索切换到 Ollama 云端（需配置 `OLLAMA_API_KEY`；内置 `web-search-deepseek` 默认停用）。
 - host 插件由本地文件加载改为正式 npm 包 `dsh-web-search-ollama`（peerDependencies：`dsh-settings`、`dsh-web`；dependencies：`schemastery`）。
 
+[0.1.4]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.4
 [0.1.3]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.3
 [0.1.2]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.2
 [0.1.1]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.1
