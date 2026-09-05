@@ -18,9 +18,18 @@
 # =============================================================================
 
 # Use the Ollama-backed search provider instead of the built-in DeepSeek one.
+# IMPORTANT: the host half registers BOTH a search and a fetch provider (both
+# with id "ollama"). If `fetchProvider` is not pinned, dsh sees two usable
+# fetch providers ("http" built-in + "ollama") and refuses to auto-select —
+# web_fetch fails with "multiple usable web providers are registered".
+# Therefore search is pinned to ollama, while fetch stays on the built-in
+# generic http provider (works for any public URL without an API key).
+# If you want Ollama to serve fetch too, change fetchProvider to "ollama"
+# (your Ollama /api/web_fetch endpoint + API key must then be reachable).
 - id: web
   config:
     searchProvider: ollama
+    fetchProvider: http
 
 # The built-in DeepSeek search provider is replaced; keep it disabled.
 - id: web-search-deepseek
