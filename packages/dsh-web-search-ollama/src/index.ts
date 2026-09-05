@@ -28,6 +28,10 @@
 
 import Schema from '@deepseek-ai/schemastery';
 import { WebError } from '@deepseek-ai/dsh-web';
+// Type-only: pulls @deepseek-ai/dsh-settings 0.1.2's `declare module
+// '@deepseek-ai/cordis'` augmentation (Context.settings) into the program so
+// `settingsCtx.settings.installSection` type-checks. Erased at runtime.
+import type {} from '@deepseek-ai/dsh-settings';
 import type { Context } from '@deepseek-ai/cordis';
 import type { WebSearchProvider, WebSearchRequest, WebSearchResult, WebSearchSource,
   WebFetchProvider, WebFetchRequest, WebFetchResult, WebFetchBody } from '@deepseek-ai/dsh-web';
@@ -361,22 +365,10 @@ class OllamaFetchProvider implements WebFetchProvider {
 }
 //#endregion
 
-// Local type shim for the settings section hook until the monorepo devDeps are
-// raised to @deepseek-ai/dsh-settings@0.1.2-rc.1 (whose bundled `cordis`
-// augmentation types `Context.settings`; 0.1.0-rc.6 / 0.1.1-rc.2 do not).
-// Runtime behavior is identical either way — this only satisfies tsc.
-interface SettingsSectionHooks<T> {
-  setSource(source: () => T): void;
-  onChange(): void;
-}
-interface SettingsLike {
-  installSection<T>(owner: unknown, ns: string, schema: unknown, entry: T, hooks: SettingsSectionHooks<T>): void;
-}
-
 function apply(ctx: Context, config: Config) {
   let current = () => config;
   ctx.inject(['settings'], (settingsCtx) => {
-    (settingsCtx as unknown as { settings: SettingsLike }).settings.installSection(ctx, NS, ConfigSchema, config, {
+    settingsCtx.settings.installSection(ctx, NS, ConfigSchema, config, {
       setSource: (source) => { current = source; },
       onChange: () => {},
     });

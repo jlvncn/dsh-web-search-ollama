@@ -2,6 +2,16 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [0.1.3] - 2026-09-05
+
+彻底切换到 DSH 0.1.2 API，**不再兼容 0.1.1 及更早**（旧版本 v0.1.0/v0.1.1/v0.1.2 的 tag 与 release 均保留，可回退）。
+
+### Changed
+
+- `peerDependencies` 收紧：`@deepseek-ai/dsh-settings` 与 `@deepseek-ai/dsh-web` 由 `^0.1.0-rc.6` → **`^0.1.2-rc.1`**（最低 dsh 0.1.2-rc.1；在 0.1.1 环境安装时即报 peer 冲突，把运行期崩溃提前到安装期暴露）。
+- monorepo `devDependencies` 对齐 `0.1.2-rc.1`（此前 `0.1.1-rc.2`），并删除 `src/index.ts` 中为旧类型编写的本地 `SettingsLike` shim，恢复官方直接调用 `settingsCtx.settings.installSection(...)`（以 `import type {} from '@deepseek-ai/dsh-settings'` 引入 0.1.2 的 `Context.settings` augmentation，运行时零开销）。
+- 内部：cordis devDependency `^4.0.1` → `^4.0.2`（与 dsh-settings 0.1.2 的 peer 对齐）。
+
 ## [0.1.2] - 2026-09-05
 
 适配 DSH **0.1.2-rc.1**：官方 `@deepseek-ai/dsh-settings` 移除了模块级 `installSettingsSection` / `settingsNamespace` 导出，改用 `SettingsProvider.installSection` 服务方法。未适配的插件在 `dsh web` 启动时即因 import 失败崩溃（`does not provide an export named 'installSettingsSection'`）。
@@ -61,6 +71,7 @@
 - 默认联网搜索从内置 DeepSeek 搜索切换到 Ollama 云端（需配置 `OLLAMA_API_KEY`；内置 `web-search-deepseek` 默认停用）。
 - host 插件由本地文件加载改为正式 npm 包 `dsh-web-search-ollama`（peerDependencies：`dsh-settings`、`dsh-web`；dependencies：`schemastery`）。
 
+[0.1.3]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.3
 [0.1.2]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.2
 [0.1.1]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.1
 [0.1.0]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.0
