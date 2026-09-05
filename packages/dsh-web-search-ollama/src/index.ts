@@ -27,7 +27,6 @@
  */
 
 import Schema from '@deepseek-ai/schemastery';
-import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings';
 import { WebError } from '@deepseek-ai/dsh-web';
 import type { Context } from '@deepseek-ai/cordis';
 import type { WebSearchProvider, WebSearchRequest, WebSearchResult, WebSearchSource,
@@ -35,7 +34,7 @@ import type { WebSearchProvider, WebSearchRequest, WebSearchResult, WebSearchSou
 
 const name = 'web-search-ollama';
 const inject = ['web'];
-const NS = settingsNamespace('web-search-ollama');
+const NS = 'web-search-ollama';
 
 const DEFAULT_API_KEY_ENV = 'OLLAMA_API_KEY';
 const DEFAULT_BASE_URL = 'https://ollama.com';
@@ -362,11 +361,25 @@ class OllamaFetchProvider implements WebFetchProvider {
 }
 //#endregion
 
+// Local type shim for the settings section hook until the monorepo devDeps are
+// raised to @deepseek-ai/dsh-settings@0.1.2-rc.1 (whose bundled `cordis`
+// augmentation types `Context.settings`; 0.1.0-rc.6 / 0.1.1-rc.2 do not).
+// Runtime behavior is identical either way — this only satisfies tsc.
+interface SettingsSectionHooks<T> {
+  setSource(source: () => T): void;
+  onChange(): void;
+}
+interface SettingsLike {
+  installSection<T>(owner: unknown, ns: string, schema: unknown, entry: T, hooks: SettingsSectionHooks<T>): void;
+}
+
 function apply(ctx: Context, config: Config) {
   let current = () => config;
-  installSettingsSection(ctx, NS, ConfigSchema, config, {
-    setSource: (source) => { current = source; },
-    onChange: () => {},
+  ctx.inject(['settings'], (settingsCtx) => {
+    (settingsCtx as unknown as { settings: SettingsLike }).settings.installSection(ctx, NS, ConfigSchema, config, {
+      setSource: (source) => { current = source; },
+      onChange: () => {},
+    });
   });
   ctx.web.registerSearchProvider(new OllamaSearchProvider(() => resolveOptions(ctx, current())));
   ctx.web.registerFetchProvider(new OllamaFetchProvider(() => resolveOptions(ctx, current())));

@@ -1,9 +1,8 @@
 import Schema from '@deepseek-ai/schemastery';
-import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings';
 import { WebError } from '@deepseek-ai/dsh-web';
 const name = 'web-search-ollama';
 const inject = ['web'];
-const NS = settingsNamespace('web-search-ollama');
+const NS = 'web-search-ollama';
 const DEFAULT_API_KEY_ENV = 'OLLAMA_API_KEY';
 const DEFAULT_BASE_URL = 'https://ollama.com';
 const DEFAULT_SEARCH_PATH = '/api/web_search';
@@ -282,9 +281,11 @@ class OllamaFetchProvider {
 }
 function apply(ctx, config) {
     let current = () => config;
-    installSettingsSection(ctx, NS, ConfigSchema, config, {
-        setSource: (source) => { current = source; },
-        onChange: () => { },
+    ctx.inject(['settings'], (settingsCtx) => {
+        settingsCtx.settings.installSection(ctx, NS, ConfigSchema, config, {
+            setSource: (source) => { current = source; },
+            onChange: () => { },
+        });
     });
     ctx.web.registerSearchProvider(new OllamaSearchProvider(() => resolveOptions(ctx, current())));
     ctx.web.registerFetchProvider(new OllamaFetchProvider(() => resolveOptions(ctx, current())));

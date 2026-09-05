@@ -6,6 +6,17 @@
 
 ---
 
+## 执行状态更新（2026-09-05）
+
+> 本插件已按 §4.1 完成适配并发布 **v0.1.2**（host 包代码 + 构建产物）。
+
+- ✅ **host 适配完成**：`installSettingsSection` / `settingsNamespace` → `ctx.inject(["settings"])` + `settingsCtx.settings.installSection(...)`（命名空间用字符串字面量），与官方 0.1.2 `dsh-web-search-deepseek` 样板一致；`tsc` 零错误、模块加载测试通过。
+- ✅ **profile 同步并冒烟验证**：构建产物已同步到 `$DSH_HOME/profiles/node_modules/`；`dsh web`（dsh 0.1.2-rc.1）插件树加载成功（进程仅因 3080 端口被另一实例占用而止步于 webserver 监听，非插件错误）。
+- ⚠️ **运行时最低要求变更**：dsh-settings 0.1.1-rc.2 尚无 `installSection` 服务方法 → 插件 v0.1.2 **仅适配 dsh ≥ 0.1.2-rc.1**；0.1.1 环境请停留在 v0.1.1。
+- ⏳ **未执行项**（受官方未修 bug / 策略影响，见 §0、§3）：client 前端整树加载验证（官方 #5544）、dsh-session 事件落库实测、credentials 双路实测、正式版复验清单。
+
+---
+
 ## 0. 一句话结论
 
 **rc 阶段不要升级**：0.1.2-rc.1 存在官方自身的前端 client-modules 加载 bug（Discussion [#5544](https://github.com/deepseek-ai/deepseek-harness/discussions/5544)，Web UI 整树加载失败，官方未回复，workaround = 留在 latest），且插件 host 侧有一个**必须改代码才能兼容**的 breaking change（`dsh-settings` 移除两个 API）。等 0.1.2 正式版 + #5544 修复后再升；升级时按本文件 §4 适配、§5 复验。
