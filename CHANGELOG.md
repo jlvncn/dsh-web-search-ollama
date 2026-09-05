@@ -2,6 +2,18 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [0.1.2] - 2026-09-05
+
+适配 DSH **0.1.2-rc.1**：官方 `@deepseek-ai/dsh-settings` 移除了模块级 `installSettingsSection` / `settingsNamespace` 导出，改用 `SettingsProvider.installSection` 服务方法。未适配的插件在 `dsh web` 启动时即因 import 失败崩溃（`does not provide an export named 'installSettingsSection'`）。
+
+### Fixed
+
+- `dsh web` 启动崩溃：host 插件改为官方 0.1.2 样板（`dsh-web-search-deepseek`）同款写法——`ctx.inject(["settings"])` 等服务就绪后调用 `settingsCtx.settings.installSection(ctx, NS, ConfigSchema, config, hooks)`；命名空间由 `settingsNamespace('web-search-ollama')` 改为字符串字面量 `'web-search-ollama'`（格式由 `installSection` 内部校验，语义不变）。
+
+### Changed
+
+- **运行时要求 `@deepseek-ai/dsh` ≥ 0.1.2-rc.1**（`dsh-settings` 0.1.2-rc.1+ 才提供 `installSection` 服务方法）。仍运行在 0.1.1 及更早 dsh 的环境请继续使用 **v0.1.1**（代码与 peer 声明在 0.1.1-rc.2 下自洽，仅不能跨版本混用）。
+
 ## [0.1.1] - 2026-08-22
 
 稳定性与健壮性版本：修复 ESM 构建竞态导致的 `dsh web` 启动崩溃、keyed-slot 缺失导致的设置卡片渲染崩溃、设置卡片 `scope.load` 未定义导致的崩溃，并按官方 `dsh-web-search-deepseek` 模式为 provider 补齐凭证缺失报错、取消语义、HTTP 错误详情透出与响应结构校验。
@@ -49,5 +61,6 @@
 - 默认联网搜索从内置 DeepSeek 搜索切换到 Ollama 云端（需配置 `OLLAMA_API_KEY`；内置 `web-search-deepseek` 默认停用）。
 - host 插件由本地文件加载改为正式 npm 包 `dsh-web-search-ollama`（peerDependencies：`dsh-settings`、`dsh-web`；dependencies：`schemastery`）。
 
+[0.1.2]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.2
 [0.1.1]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.1
 [0.1.0]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.0
