@@ -163,6 +163,31 @@ curl -s -X POST http://127.0.0.1:3080/api/settings.describe \
 2. 删除（或保留无害）`$DSH_HOME/profiles/node_modules/dsh-web-search-ollama/` 与 `.../dsh-web-search-ollama-client/`；
 3. 重启 `dsh web`。
 
+## 恢复历史会话（v0 → v3）
+
+v0.1.5 之前，本插件会把审计事件写进会话。含该事件的 **v0 格式**会话无法通过 DSH 的 v0→v1 迁移，表现为打不开：
+
+```text
+failed to observe session "session-…": @deepseek-ai/dsh-session-format-v0-to-v1 refuses this format v0
+Session: web/deepseek-search-llm-request N body has unexpected member "query"
+```
+
+升级插件只能阻止**新增**损坏，修复不了已经在磁盘上的日志。用 `scripts/migrate-v0-sessions.mjs` 做一次性恢复：
+
+```bash
+node scripts/migrate-v0-sessions.mjs                   # 干跑（默认，不写盘）
+node scripts/migrate-v0-sessions.mjs --verify-existing  # 校验已有的 v3 产物
+node scripts/migrate-v0-sessions.mjs --relax-v0-validator --normalize-descriptor-v2 --apply
+```
+
+脚本的安全保证：
+
+- **源 v0 文件从不改动**；产物先写 `*.staging`、通过严格校验后才用 `link` 原子发布，已有 `session.vN.jsonl.zstd` 不覆盖。
+- **默认干跑**，必须显式 `--apply` 才写盘。
+- 会话默认从 `$DSH_HOME/sessions` 下所有项目目录读取，可用 `--root` / `--ids` / `--only` 收窄。
+- `--normalize-descriptor-v2` 修复 `subagent/descriptor` 版本 2 的旧日志（形状与 v3 一致，仅版本标记不同），**不需要放宽任何校验器**。
+- `--relax-v0-validator` 仅用于"冻结载荷清单过窄"导致的拒绝（Ollama body、`permission/preset` 的 `origin`）。它会临时改写 DSH 安装里的 v0→v1 校验器，**重新 exec 自身让 ESM 加载到放宽版**，并在结束时无条件还原。上游读者侧修复进展见 [deepseek-ai/deepseek-harness#5818](https://github.com/deepseek-ai/deepseek-harness/discussions/5818)。
+
 ## 开发
 
 ```bash
