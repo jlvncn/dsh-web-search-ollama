@@ -11,8 +11,10 @@ UI's 设置 → 插件设置 → 插件配置 tab (the `settings.plugin.item` sl
   - injects the card styles (theme tokens, mirrors the official `PluginCard`)
   - binds the `web-search-ollama` settings namespace via `settingsScope`
   - renders a **collapsible card** (header + chevron, like the built-in cards)
-    with 7 editable fields and save/reset actions; writes hot-apply via the
-    host settings provider (no restart).
+    with 8 editable fields (baseURL, apiKey, apiKeyEnv, searchPath, fetchPath,
+    snippetMax, searchTimeoutMs, fetchTimeoutMs) and save/reset actions; writes
+    hot-apply via the host settings provider (no restart). The host-only
+    `enableFetchProvider` switch is intentionally not exposed here.
 - `index.js` is an empty host-side `apply()` — the entry must exist in the
   Cordis loader so `dsh-client-modules` discovers the client bundle.
 

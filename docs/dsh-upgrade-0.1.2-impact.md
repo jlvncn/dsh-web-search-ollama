@@ -18,6 +18,19 @@
 
 ---
 
+## 执行状态更新（2026-09-10 · v0.1.5）
+
+> 本文件主体记录的是 0.1.2 升级评估（历史）。以下是后续状态，**其中两条覆盖下文已过时的判断**。
+
+- 🔴 **重大发现：审计事件会损坏会话（v0.1.5 已修复）**：v0.1.4 及更早把每次搜索/抓取写成官方事件 `web/deepseek-search-llm-request`。该事件由官方 `dsh-web-search-deepseek` 拥有，其已发布 v0 载荷被冻结为官方请求体（`model`/`max_tokens`/`messages`/`tools`）；插件写入的 Ollama 体（`{query,max_results}`）会让**任何包含该事件的 v0 格式会话无法通过 `dsh-session-format-v0-to-v1` 迁移**，读取时报 `body has unexpected member "query"` 而拒绝打开。因此 §1 中「known-event-types 🟢 兼容」与「会话 API 🟡 预计可用」两条判断**不成立**（详见行内标注）。
+- ✅ **v0.1.5 修复**：移除审计事件，插件不再写入任何会话事件。已用一次性迁移脚本把受影响的历史会话发布为当前 v3 generation（本机 32 个会话已全部可读）。
+- ✅ **配置面变化**：schema 现为 10 个字段（Web UI 卡片展示 8 个）；`apiVersion` 变为保留但无效；新增 `searchTimeoutMs`；新增 `enableFetchProvider`（默认 `false`）。
+- ✅ **超时语义修复**：fetch 超时不再被误判为 `WEB_ABORTED`（此前判断顺序让超时分支不可达）；搜索补齐 `searchTimeoutMs`。
+- ✅ **fetch provider 默认不再注册**：因此 §5.3 后「多 provider 冲突」坑在默认配置下不再出现（`enableFetchProvider: true` 时才需固定 `fetchProvider`）。
+- 下文行内以 **⚠️ 已过时（v0.1.5）** 标注受影响的判断与清单项。
+
+---
+
 ## 0. 一句话结论
 
 **rc 阶段不要升级**：0.1.2-rc.1 存在官方自身的前端 client-modules 加载 bug（Discussion [#5544](https://github.com/deepseek-ai/deepseek-harness/discussions/5544)，Web UI 整树加载失败，官方未回复，workaround = 留在 latest），且插件 host 侧有一个**必须改代码才能兼容**的 breaking change（`dsh-settings` 移除两个 API）。等 0.1.2 正式版 + #5544 修复后再升；升级时按本文件 §4 适配、§5 复验。
@@ -30,8 +43,8 @@
 | 官方 `dsh-web-search-deepseek` 样板 | 已切换到新 `installSection` 写法 + `@deepseek-ai/dsh-credentials` | 参照物 | 照抄其 apply 结构 |
 | `@deepseek-ai/dsh-web`：`WebError` / `registerSearchProvider` / `registerFetchProvider` | 导出面、错误码枚举、选择语义**完全一致**；新增 `$DSH_WEB_SEARCH_PROVIDER` env 覆盖 | 🟢 兼容 | 无 |
 | provider 抛出的 code（`WEB_PROVIDER_ERROR` 等） | 开放字符串 code 机制不变，dsh-web 只枚举 provider 注册类错误 | 🟢 兼容 | 无 |
-| `dsh-session` known-event-types | `web/deepseek-search-llm-request` 两版均在 | 🟢 兼容 | 无 |
-| `dsh-session` 会话 API | 0.1.2 重构（append-only log / surfaceOp / seq 强类型，`Session.events` 被 `seq`+`eventAt()`+`snapshotEvents()` 取代） | 🟡 需实测 | 插件的审计 `session.append(...)` 是 best-effort + try/catch，预计可用；升级后实测事件是否落库 |
+| `dsh-session` known-event-types | `web/deepseek-search-llm-request` 两版均在 | ~~🟢 兼容~~ **⚠️ 已过时（v0.1.5）** | 事件类型"存在"不等于"可安全写入"：v0 冻结迁移只接受官方请求体，插件写入的 Ollama 体使会话无法打开。v0.1.5 起不再写该事件 |
+| `dsh-session` 会话 API | 0.1.2 重构（append-only log / surfaceOp / seq 强类型，`Session.events` 被 `seq`+`eventAt()`+`snapshotEvents()` 取代） | ~~🟡 需实测~~ **⚠️ 已过时（v0.1.5）** | 审计 `session.append(...)` 已在 v0.1.5 整体移除——问题不在 API 可用性，而在写入的载荷不满足冻结格式 |
 | `ctx.credentials.resolve(envName)` | 0.1.2 独立成 `@deepseek-ai/dsh-credentials`（`CredentialProvider`），服务名与 `resolve` 保留 | 🟢/🟡 兼容性高 | 升级后实测环境变量与 credentials 两路取 key |
 | **client 包加载机制** | `dsh-client-runtime` **0.1.2 移除**；`dsh-client-modules` 规则面措辞不变，但 **0.1.2-rc.1 自身有 externals drift bug**（#5544：官方 controller 包的 `require` 未编入 manifest → 前端整树加载失败） | 🔴 **阻塞验证** | §3：等官方修复 |
 | settings RPC 通道（host-apiproxy） | `dsh-host-apiproxy` **0.1.2 移除**，功能并入 `dsh-api-gateway`（29KB→80KB） | 🟡 需实测 | 升级后复验 `settings.describe` 仍返回 `web-search-ollama`；client 走官方 settingsScope 抽象，应跟随官方 |
@@ -110,7 +123,7 @@ function apply(ctx, config) {
 - [ ] host 日志无 `settings namespace ... is not registered` / provider 注册失败
 
 ### 5.2 settings 通道（APIProxy → api-gateway 迁移验证）
-- [ ] `POST /api/settings.describe`：namespaces 含 `web-search-ollama`，schema 仍为 8 字段（含 apiVersion）
+- [ ] ~~`POST /api/settings.describe`：namespaces 含 `web-search-ollama`，schema 仍为 8 字段（含 apiVersion）~~ **⚠️ 已过时（v0.1.5）：schema 现为 10 字段，`apiVersion` 保留但无效，UI 卡片展示 8 字段（含新增的 `searchTimeoutMs`）**
 - [ ] `settings.update` 写一个字段（如 snippetMax）→ `settings.yaml` 落盘 → 改回
 - [ ] Web UI：设置 → 插件设置 → 插件配置 → Ollama 网页搜索卡片可展开、可保存（client-modules 修复后）
 
@@ -119,7 +132,7 @@ function apply(ctx, config) {
 - [ ] 抓取（插件路径）：`fetchProvider: ollama` 时走 `/api/web_fetch` 正常返回正文
 - [ ] 抓取（内置 http，2026-09-05 补）：`fetchProvider: http` 时 `web_fetch` 任意公网 URL 正常返回（如 `fetch http://example.com`）
 - [ ] 凭证两路：`OLLAMA_API_KEY` 环境变量 / credentials 均能解析；无 key 时报 `WEB_PROVIDER_CREDENTIAL_MISSING`
-- [ ] 审计事件：会话记录含 `web/deepseek-search-llm-request` 且**重启后可加载**（0.1.2 session 重构后重点验）
+- [x] ~~审计事件：会话记录含 `web/deepseek-search-llm-request` 且**重启后可加载**（0.1.2 session 重构后重点验）~~ **⚠️ 已作废（v0.1.5）**：该事件本身就是会话无法加载的根因，已在 v0.1.5 移除。本项改为**会话可加载性**验证——用一个曾记录该事件的历史 v0 会话走正常读取路径，确认能打开。
 
 > ⚠️ **多 provider 冲突坑（2026-09-05 实测，务必写入复验）**：本插件 host 半会同时注册
 > **搜索 provider 与抓取 provider（id 均为 `ollama`）**。若 `cordis.patch.yml` 只固定
@@ -131,6 +144,8 @@ function apply(ctx, config) {
 > 当前方案：`searchProvider: ollama` + `fetchProvider: http`（搜索走 Ollama、抓取走内置通用 http）；
 > 若希望抓取也走 Ollama 则改 `fetchProvider: ollama`（需 `/api/web_fetch` + key 可达）。
 > 补充环境变量等价物：`$DSH_WEB_SEARCH_PROVIDER` / `$DSH_WEB_FETCH_PROVIDER`。
+> **v0.1.5 更新**：Ollama fetch provider 改为 `config.enableFetchProvider: true` 显式开启且**默认关闭**，
+> 因此默认配置下不再产生该冲突；仅在开启后仍需按下文固定 `fetchProvider`。
 
 ### 5.4 回归
 - [ ] 取消语义：中断请求不残留、错误归类正常

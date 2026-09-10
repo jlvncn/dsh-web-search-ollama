@@ -4,9 +4,9 @@ Ollama 云端搜索 / 抓取插件，用于 [DeepSeek Harness](https://github.co
 
 ## 特性
 
-- 🔍 **搜索 + 抓取**：注册 `searchProvider` 与 `fetchProvider`（`POST {baseURL}{searchPath}` / `{baseURL}{fetchPath}`）。
-- 🎛️ **可视化配置**：浏览器端配置卡片（7 个字段：API 地址、密钥、路径、超时等），保存即热更新 `settings.yaml`。
-- 🔐 **密钥安全**：API Key 只写不读、不回显；支持从环境变量读取（`apiKeyEnv`，credentials 解析）。
+- 🔍 **搜索 + 抓取**：注册 `searchProvider`（默认）与可选 `fetchProvider`（`POST {baseURL}{searchPath}` / `{baseURL}{fetchPath}`）。
+- 🎛️ **可视化配置**：浏览器端配置卡片（8 个字段：API 地址、密钥、路径、超时等），保存即热更新 `settings.yaml`。
+- 🔐 **密钥安全**：API Key 只写不读、不回显；支持从凭据 / 启动环境（`apiKeyEnv`）读取。
 - 📦 **零构建**：两个包均为纯 JS / 手写 ModuleLoader bundle，无需编译。
 - ♻️ **热重载**：改 `cordis.patch.yml` 后 loader 自动 diff 重新加载；改 client bundle 后刷新页面即生效。
 
@@ -16,7 +16,7 @@ DSH 的插件分两个运行端，本插件拆成两个 npm 包（都必需）�
 
 | 包 | 运行端 | 职责 |
 |---|---|---|
-| `dsh-web-search-ollama` | **host**（Node.js 进程） | 注册搜索/抓取 provider、安装 `web-search-ollama` settings 命名空间 |
+| `dsh-web-search-ollama` | **host**（Node.js 进程） | 注册搜索 provider（抓取 provider 可选）、安装 `web-search-ollama` settings 命名空间 |
 | `dsh-web-search-ollama-client` | **client**（浏览器） | 在「插件配置」页注册配置卡片（经 `settings.plugin.item` slot） |
 
 client 包**必须**以包名形式存在于 profile 的 node_modules（其 `package.json` 声明 `exports["./client"]` + `dsh.client`），`dsh-client-modules` 才能扫描到并注入浏览器。因此插件列表页会看到两个条目：`web-search-ollama` 与 `web-search-ollama-client`——这是架构使然，不是重复加载。
@@ -85,6 +85,7 @@ cp packages/dsh-web-search-ollama-client/*       "$DSH_HOME/profiles/node_module
 - id: web
   config:
     searchProvider: ollama          # 让模型使用 Ollama 搜索
+    fetchProvider: http             # 抓取继续用内置通用 http provider
 
 - id: web-search-deepseek
   disabled: true                    # 停用内置 DeepSeek 搜索
@@ -97,6 +98,7 @@ cp packages/dsh-web-search-ollama-client/*       "$DSH_HOME/profiles/node_module
         searchPath: /api/web_search
         fetchPath: /api/web_fetch
         apiKeyEnv: OLLAMA_API_KEY
+        # enableFetchProvider: true        # 如需 Ollama 也接管抓取，打开并把上面的 fetchProvider 改为 ollama
     - id: web-search-ollama-client
       name: 'dsh-web-search-ollama-client'   # client 包
 ```
@@ -144,11 +146,16 @@ curl -s -X POST http://127.0.0.1:3080/api/settings.describe \
 |---|---|---|
 | `baseURL` | `https://ollama.com` | Ollama API 根地址 |
 | `apiKey` | （空） | 字面密钥，只写不读；留空保持当前密钥 |
-| `apiKeyEnv` | `OLLAMA_API_KEY` | `apiKey` 为空时从该环境变量读取（credentials 解析） |
+| `apiKeyEnv` | `OLLAMA_API_KEY` | `apiKey` 为空时按 credentials → 启动环境（`.env`）→ `process.env` 解析 |
 | `searchPath` | `/api/web_search` | POST 搜索端点路径 |
 | `fetchPath` | `/api/web_fetch` | POST 抓取端点路径 |
 | `snippetMax` | `2000` | 每条搜索结果的 content 截断长度 |
+| `searchTimeoutMs` | `30000` | 搜索请求的 abort 超时（毫秒） |
 | `fetchTimeoutMs` | `15000` | 抓取请求的 abort 超时（毫秒） |
+| `enableFetchProvider` | `false` | 是否把 Ollama 也注册为 fetch provider。仅 loader 配置（Web UI 不暴露）；默认关闭以免与内置 `http` provider 冲突 |
+| `apiVersion` | `v1` | **已弃用**：保留仅为兼容旧配置，插件不再写会话事件 |
+
+> **v0.1.5 起：本插件不再写入任何会话事件。** 此前它把 Ollama 请求记录成官方事件 `web/deepseek-search-llm-request`，但该事件属于内置 DeepSeek 搜索 provider，其 v0 冻结载荷只接受官方请求体（`model`/`max_tokens`/`messages`/`tools`）。用 Ollama 的 `{query,max_results}` 冒用该事件名，会让**任何包含它的 v0 格式会话无法通过 v0→v1 迁移、从而打不开**。仓库外插件也无法注册自己的必需事件类型（`SessionEventMap` 扩展不在构建期静态词表内），因此该 provider 不再进入会话日志。
 
 ## 卸载
 
@@ -160,10 +167,10 @@ curl -s -X POST http://127.0.0.1:3080/api/settings.describe \
 
 ```bash
 pnpm install          # 安装 host 包测试所需的 devDependencies
-pnpm test             # 模块形状测试（packages/dsh-web-search-ollama/test.mjs）
+pnpm test             # 模块形状测试 + provider 行为测试（test.mjs + test-providers.mjs）
 ```
 
-改动 host 包源码 `packages/dsh-web-search-ollama/index.js` 后，运行 `./scripts/install.sh` 同步到 profile（或手动 `cp` 到 `$DSH_HOME/profiles/node_modules/dsh-web-search-ollama/index.js`）。
+改动 host 包源码 `packages/dsh-web-search-ollama/src/index.ts` 后，运行 `npm run build --prefix packages/dsh-web-search-ollama` 重建 `index.js`，再运行 `./scripts/install.sh` 同步到 profile（或手动 `cp` 到 `$DSH_HOME/profiles/node_modules/dsh-web-search-ollama/`）。
 
 ## 故障排查
 
@@ -173,6 +180,7 @@ pnpm test             # 模块形状测试（packages/dsh-web-search-ollama/test
 | 配置页卡片显示"设置命名空间不可用" | `settings.describe` 里没有 `web-search-ollama` → host 包未 apply（检查 `pluginInventory.list` 中 `web-search-ollama` 是否 active / failed） |
 | 改了 client.js 页面没变化 | 刷新页面（`serveBundle` 每次读取磁盘，`cache-control: no-cache`；不必重启 dsh） |
 | 插件列表出现两个 ollama 条目 | 正常：host + client 两个 half，见上文「架构」 |
+| **旧会话打不开，报 `web/deepseek-search-llm-request … body has unexpected member "query"`** | v0.1.5 之前插件把 Ollama 请求写成官方事件，导致含该事件的 **v0 格式**会话无法通过 v0→v1 迁移。升级到 v0.1.5（不再写任何会话事件）即可止住新增；**已在磁盘上的历史 v0 会话需要单独做一次性 v0→v3 迁移**，升级插件本身不会修复它们。 |
 | **macOS 上用云端 `https://ollama.com` 搜索超时 / `UND_ERR_CONNECT_TIMEOUT`，但 `nslookup` 正常** | 本机 `getaddrinfo` 对该域名的缓存异常（某些网络环境会恰好卡 ~30s）。执行 `sudo dscacheutil -flushcache && sudo killall -HUP mDNSResponder` 即可（仅清空本地 DNS 缓存，安全可逆，无需改 `/etc/hosts`）。若反复出现，建议改用自建 Ollama（`baseURL` 填 `http://localhost:11434`） |
 
 ## License

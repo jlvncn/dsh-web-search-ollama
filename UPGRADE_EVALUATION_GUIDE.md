@@ -2,9 +2,11 @@
 
 Based on the experience upgrading the dsh-web-search-ollama plugin from DSH 0.1.1-rc.2 to 0.1.2-rc.1, this guide outlines a systematic process to evaluate future DSH versions for compatibility, avoiding unexpected breakages.
 
-## 📌 Key Lesson
+## 📌 Key Lessons
 
-Compatibility must be assessed **transitively** through the plugin’s entire dependency chain—not just by scanning the plugin’s own code for deprecated APIs. A breaking change in a dependency (e.g., `@deepseek-ai/dsh-settings`) can cause import-time failures even if the plugin itself does not use deprecated APIs directly.
+**1. Compatibility is transitive.** Compatibility must be assessed **transitively** through the plugin’s entire dependency chain—not just by scanning the plugin’s own code for deprecated APIs. A breaking change in a dependency (e.g., `@deepseek-ai/dsh-settings`) can cause import-time failures even if the plugin itself does not use deprecated APIs directly.
+
+**2. A plugin’s persistence footprint is part of its compatibility surface (2026-09-10).** Writing into the session log couples the plugin to a **frozen** format validator that cannot be changed retroactively. v0.1.4 of this plugin recorded its audit event under the first-party name `web/deepseek-search-llm-request` with an Ollama payload (`{query,max_results}`). The frozen v0→v1 edge validates that event against DeepSeek’s request body, so every **v0-format** session containing it failed to migrate — `body has unexpected member "query"` — and the session became unopenable, long after the write succeeded. Reusing an official event type with a foreign payload is therefore *not* a safe shortcut. A plugin-owned **required** event type is not a way out either: `dsh-session`’s build-static `KNOWN_SESSION_EVENT_TYPES` does not include out-of-repo types, and `Session.append()` exposes no `ignorable` marker for non-surface events. **Default to writing no session events.** If you must record, keep the payload inside a shape the released validators already accept, and verify by *reopening the log through the normal read path* — a successful write proves nothing about a later read.
 
 ## 🔍 Evaluation Process
 
@@ -32,7 +34,7 @@ Compatibility must be assessed **transitively** through the plugin’s entire de
    - Check `ctx` usage:
      - Does the plugin call `ctx.get('<service>')`? Ensure the service still exists with expected methods.
      - Does the plugin register capabilities via `ctx.<something>.register<...>()`? Ensure those registration methods still exist.
-     - Does the plugin use event lifecycles (e.g., `session.append`)? Prefer official event types (e.g., `web/deepseek-search-llm-request`) to avoid session-load issues.
+     - Does the plugin write into the session log (`session.append`, `currentInitiator().session`)? Prefer **not writing at all**. Reusing a first-party event type (e.g. `web/deepseek-search-llm-request`) with a payload the frozen migration validators do not expect makes whole historical sessions unopenable — the opposite of avoiding session-load issues. A plugin-owned *required* event type is not registrable either. See Key Lesson 2.
 
 ### 4. Determine Required Adaptations
    For each breaking change found:
@@ -61,7 +63,7 @@ Compatibility must be assessed **transitively** through the plugin’s entire de
    - **Runtime tool-invocation test (2026-09-05 addendum)**: Configuration-layer conflicts only surface when the tool is actually invoked — never at load time. If a plugin registers a provider into a seam (e.g., `ctx.web` fetch) alongside a built-in provider (e.g., `http`), the seam refuses to auto-select and the tool errors (e.g., `web_fetch` → `multiple usable web providers are registered (http, ollama); configure one explicitly`). Therefore:
      - Always perform a **real `web_fetch` call** (e.g., fetch `http://example.com`) **and** a real `web_search` call — not just one of them.
      - When multiple providers can serve one seam, **pin the provider explicitly** in the profile config (e.g., `searchProvider: ollama` + `fetchProvider: http`; env equivalents `$DSH_WEB_SEARCH_PROVIDER` / `$DSH_WEB_FETCH_PROVIDER`).
-   - **Event test**: Are audit events still recorded and survivable across session restarts? (Use official event types.)
+   - **Session-load test**: If the plugin writes any session event, reopen a session recorded with it **through the normal read path** — and, when the write may predate the current format, also exercise the adjacent migration chain. A write that succeeds can still make the log unreadable later (Key Lesson 2). A plugin that writes nothing passes this trivially; confirm that with a grep rather than by assumption.
    - **Cleanup test**: Are registrations properly torn down when the plugin unloads/reloads?
 
 ### 6. Document and Version
