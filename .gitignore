@@ -33,3 +33,14 @@ lerna-debug.log*
 *.tmp
 tmp/
 temp/
+
+# ---- Secrets ----------------------------------------------------------------
+# Local environment and credential files must never be committed. GitHub push
+# protection only recognizes provider-shaped tokens (sk-, ghp_, …), so this
+# rule is the real guard for custom keys such as OLLAMA_API_KEY.
+.env
+.env.*
+!.env.example
+.credentials*
+*.pem
+*.p12
