@@ -1,6 +1,6 @@
 {
   "name": "dsh-web-search-ollama",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Ollama-backed search & fetch provider for the DeepSeek Harness `ctx.web` seam (host half of the web-search-ollama plugin)",
   "type": "module",
   "engines": {
@@ -14,7 +14,8 @@
     "./src/*": "./src/*"
   },
   "files": [
-    "index.js"
+    "index.js",
+    "src"
   ],
   "license": "MIT",
   "publishConfig": {
@@ -35,11 +36,6 @@
     "web-search",
     "ollama"
   ],
-  "dsh": {
-    "bundle": {
-      "patch": "./cordis.patch.yml"
-    }
-  },
   "scripts": {
     "build": "tsc --outDir . --esModuleInterop --target es2020 --module esnext --skipLibCheck",
     "prepare": "npm run build"

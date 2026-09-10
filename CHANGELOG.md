@@ -2,6 +2,28 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [0.1.5] - 2026-09-10
+
+修复性升级：**停止写入会话事件**（历史遗留 v0 会话打不开的根因）、修正超时分类、搜索补齐超时、凭证解析对齐启动环境、Ollama fetch provider 改为可选注册。
+
+### Fixed
+
+- **会话损坏（严重）**：host 半此前把每次搜索/抓取记录成官方事件 `web/deepseek-search-llm-request`。该事件由官方 `dsh-web-search-deepseek` 拥有，其已发布 v0 载荷被冻结为官方请求体（`model` / `max_tokens` / `messages` / `tools`）；插件写入的 Ollama 体（`{query,max_results}` / `{url}`）会让**任何包含该事件的 v0 格式会话无法通过 `dsh-session-format-v0-to-v1` 迁移**，读取时报 `body has unexpected member "query"` 并拒绝打开。现移除该审计事件，插件不再写入任何会话事件。仓库外插件也无法注册自己的必需事件类型（`SessionEventMap` 的类型扩展不在构建期静态词表 `KNOWN_SESSION_EVENT_TYPES` 内，且 `Session.append()` 不暴露 `ignorable` 标记），因此也无法简单改用自定义事件名。
+- **超时被误报为取消**：fetch 的 `catch` 先判断合并信号已 abort、再判断 `TimeoutError`，导致超时永远走 `WEB_ABORTED`，专门的超时分支不可达。现按来源区分：调用方 `signal` 取消 → `WEB_ABORTED`；`AbortSignal.timeout` 触发 → `WEB_PROVIDER_ERROR`（消息含 `timed out`）。
+- **搜索无超时**：`fetchTimeoutMs` 只作用于抓取，搜索挂起会无限等待。新增 `searchTimeoutMs`（默认 30000）。
+
+### Changed
+
+- **Ollama fetch provider 改为可选**：新增 `enableFetchProvider`（默认 `false`）。此前无条件注册会让 `ctx.web` 同时存在内置 `http` 与 `ollama` 两个可用抓取 provider，未显式固定 `fetchProvider` 时抓取报多 provider 冲突。现默认只注册搜索 provider；需要时在 loader 配置中打开并把 `fetchProvider` 固定为 `ollama`。
+- **凭证/环境解析对齐启动环境**：环境兜底由 `process.env` 改为优先读 launcher 的 launch-environment 快照（覆盖 process / 项目 `.env` / `$DSH_HOME/.env`），再回退 `process.env`；不新增运行时依赖。
+- `apiVersion` 变为保留字段（不再产生任何效果）；Web UI 配置卡片移除该字段，改为展示 `searchTimeoutMs`。
+- 文档与示例 patch 同步；`package.json` 修正 `files`（纳入 `src`，使 `types` / `exports["./src/*"]` 生效），移除指向不存在文件的 `dsh.bundle.patch` 声明；版本号统一为 `0.1.5`。
+- 新增 `test-providers.mjs`（8 项行为测试，含"绝不写会话事件"回归守卫）；`pnpm test` 现在同时运行形状测试与行为测试。
+
+### Notes
+
+- 磁盘上已有的历史 v0 会话**不会**因升级本插件而恢复，需要单独做一次性 v0→v3 迁移。
+
 ## [0.1.4] - 2026-09-05
 
 修复 host 半同时注册搜索/抓取 provider 导致的 **web_fetch 多 provider 冲突**，并沉淀升级评估文档。
@@ -44,6 +66,7 @@
 ### Changed
 
 - 审计事件 `web/deepseek-search-llm-request` 的载荷补充 `apiVersion` 字段（默认 `v1`），与官方 `DeepSeekSearchLlmRequest` 事件形状对齐（`endpoint` / `apiVersion` / `body`）。
+  > **更正（0.1.5）**：这里只对齐了顶层字段，嵌套 `body` 仍是 Ollama 形状（`{query,max_results}`），这正是 v0 会话无法迁移、打不开的原因。该审计事件已在 0.1.5 整体移除。
 - `apiVersion` 变为可配置字段（host `Config` schema + Web UI 配置卡片第 8 个字段，默认 `v1`；Ollama 无版本头，仅作为审计标签）。
 - 凭证缺失时抛出 `WEB_PROVIDER_CREDENTIAL_MISSING`（附带缺失的环境变量名与配置指引），不再静默发送无鉴权请求。
 - `available()` 增强：校验 `baseURL` 可解析（`new URL` 可构造）且数值配置为正整数。
@@ -84,6 +107,7 @@
 - 默认联网搜索从内置 DeepSeek 搜索切换到 Ollama 云端（需配置 `OLLAMA_API_KEY`；内置 `web-search-deepseek` 默认停用）。
 - host 插件由本地文件加载改为正式 npm 包 `dsh-web-search-ollama`（peerDependencies：`dsh-settings`、`dsh-web`；dependencies：`schemastery`）。
 
+[0.1.5]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.5
 [0.1.4]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.4
 [0.1.3]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.3
 [0.1.2]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.2

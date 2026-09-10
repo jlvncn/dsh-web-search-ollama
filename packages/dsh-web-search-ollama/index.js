@@ -8,6 +8,7 @@ const DEFAULT_BASE_URL = 'https://ollama.com';
 const DEFAULT_SEARCH_PATH = '/api/web_search';
 const DEFAULT_FETCH_PATH = '/api/web_fetch';
 const DEFAULT_SNIPPET_MAX = 2000;
+const DEFAULT_SEARCH_TIMEOUT_MS = 30000;
 const DEFAULT_FETCH_TIMEOUT_MS = 15000;
 const DEFAULT_API_VERSION = 'v1';
 const ConfigSchema = Schema.object({
@@ -18,8 +19,18 @@ const ConfigSchema = Schema.object({
     fetchPath: Schema.string().default(DEFAULT_FETCH_PATH),
     apiVersion: Schema.string().default(DEFAULT_API_VERSION),
     snippetMax: Schema.number().step(1).min(1).default(DEFAULT_SNIPPET_MAX),
+    searchTimeoutMs: Schema.number().step(1).min(1).default(DEFAULT_SEARCH_TIMEOUT_MS),
     fetchTimeoutMs: Schema.number().step(1).min(1).default(DEFAULT_FETCH_TIMEOUT_MS),
+    enableFetchProvider: Schema.boolean().default(false),
 });
+function ambientEnv(ctx, name) {
+    const snapshot = ctx.get('launchEnvironment');
+    const resolved = snapshot?.get?.(name)?.value;
+    if (resolved != null && resolved.length > 0)
+        return resolved;
+    const ambient = process.env[name];
+    return ambient != null && ambient.length > 0 ? ambient : undefined;
+}
 function resolveOptions(ctx, config) {
     const apiKeyEnv = config.apiKeyEnv ?? DEFAULT_API_KEY_ENV;
     return {
@@ -36,28 +47,21 @@ function resolveOptions(ctx, config) {
                 }
                 catch { }
             }
-            const ambient = process.env[apiKeyEnv];
-            return ambient != null && ambient.length > 0 ? ambient : undefined;
+            return ambientEnv(ctx, apiKeyEnv);
         },
         apiKeyEnv,
         baseURL: config.baseURL ?? DEFAULT_BASE_URL,
         searchPath: config.searchPath ?? DEFAULT_SEARCH_PATH,
         fetchPath: config.fetchPath ?? DEFAULT_FETCH_PATH,
-        apiVersion: typeof config.apiVersion === 'string' && config.apiVersion.length > 0
-            ? config.apiVersion
-            : DEFAULT_API_VERSION,
         snippetMax: Number.isInteger(config.snippetMax) && config.snippetMax > 0
             ? config.snippetMax
             : DEFAULT_SNIPPET_MAX,
+        searchTimeoutMs: Number.isInteger(config.searchTimeoutMs) && config.searchTimeoutMs > 0
+            ? config.searchTimeoutMs
+            : DEFAULT_SEARCH_TIMEOUT_MS,
         fetchTimeoutMs: Number.isInteger(config.fetchTimeoutMs) && config.fetchTimeoutMs > 0
             ? config.fetchTimeoutMs
             : DEFAULT_FETCH_TIMEOUT_MS,
-        recordRequest: (payload) => {
-            try {
-                ctx.get('agents')?.currentInitiator()?.session?.append?.('web/deepseek-search-llm-request', payload);
-            }
-            catch { }
-        },
     };
 }
 function authHeaders(apiKey) {
@@ -159,21 +163,27 @@ class OllamaSearchProvider {
         if (request.maxResults != null && typeof request.maxResults === 'number' && request.maxResults > 0) {
             payload.max_results = Math.min(request.maxResults, 10);
         }
-        o.recordRequest?.({ endpoint, apiVersion: o.apiVersion, body: payload });
         throwIfAborted(signal, 'Ollama web search');
+        const timeoutSignal = AbortSignal.timeout(o.searchTimeoutMs);
+        const abortSignal = signal !== undefined ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
         let response;
         try {
             response = await fetch(endpoint, {
                 method: 'POST',
                 headers: authHeaders(apiKey),
                 body: JSON.stringify(payload),
-                signal,
+                signal: abortSignal,
             });
         }
         catch (error) {
             const err = error;
-            if (signal?.aborted === true || isAbortError(err))
+            if (signal?.aborted === true)
                 throw aborted('Ollama web search', signal, err);
+            if (timeoutSignal.aborted === true) {
+                throw new WebError(`Ollama web search timed out after ${o.searchTimeoutMs}ms`, 'WEB_PROVIDER_ERROR', { cause: err });
+            }
+            if (isAbortError(err))
+                throw aborted('Ollama web search', abortSignal, err);
             throw new WebError(`Ollama web search request failed: ${String(err)}`, 'WEB_PROVIDER_ERROR', { cause: err });
         }
         if (!response.ok) {
@@ -236,7 +246,6 @@ class OllamaFetchProvider {
         throwIfAborted(signal, 'Ollama web fetch');
         const endpoint = `${o.baseURL.replace(/\/+$/, '')}${o.fetchPath}`;
         const payload = { url: request.url };
-        o.recordRequest?.({ endpoint, apiVersion: o.apiVersion, body: payload });
         const timeoutSignal = AbortSignal.timeout(o.fetchTimeoutMs);
         const abortSignal = signal !== undefined ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
         let response;
@@ -250,11 +259,13 @@ class OllamaFetchProvider {
         }
         catch (error) {
             const err = error;
-            if (abortSignal?.aborted === true || isAbortError(err))
-                throw aborted('Ollama web fetch', abortSignal, err);
-            if (err instanceof Error && err.name === 'TimeoutError') {
+            if (signal?.aborted === true)
+                throw aborted('Ollama web fetch', signal, err);
+            if (timeoutSignal.aborted === true) {
                 throw new WebError(`Ollama web fetch timed out after ${o.fetchTimeoutMs}ms`, 'WEB_PROVIDER_ERROR', { cause: err });
             }
+            if (isAbortError(err))
+                throw aborted('Ollama web fetch', abortSignal, err);
             throw new WebError(`Ollama web fetch request failed: ${String(err)}`, 'WEB_PROVIDER_ERROR', { cause: err });
         }
         if (!response.ok) {
@@ -288,7 +299,9 @@ function apply(ctx, config) {
         });
     });
     ctx.web.registerSearchProvider(new OllamaSearchProvider(() => resolveOptions(ctx, current())));
-    ctx.web.registerFetchProvider(new OllamaFetchProvider(() => resolveOptions(ctx, current())));
+    if (config.enableFetchProvider === true) {
+        ctx.web.registerFetchProvider(new OllamaFetchProvider(() => resolveOptions(ctx, current())));
+    }
 }
 export { ConfigSchema as Config };
 export default { name, inject, apply };

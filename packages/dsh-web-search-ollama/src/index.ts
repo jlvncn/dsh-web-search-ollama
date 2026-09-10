@@ -3,11 +3,19 @@
  *
  * An Ollama-backed web capability plugin for the DeepSeek Harness `ctx.web`
  * seam. Modeled on @deepseek-ai/dsh-web-search-deepseek: it installs a
- * settings section (`web-search-ollama`), registers BOTH a search provider
- * (Ollama `/api/web_search`) and a fetch provider (Ollama `/api/web_fetch`),
- * resolves the credential per operation through `ctx.credentials`, classifies
- * failures as WebError codes, and records secret-free requests in the
- * initiating Agent session.
+ * settings section (`web-search-ollama`), registers a search provider (Ollama
+ * `/api/web_search`) and — only when explicitly enabled — a fetch provider
+ * (Ollama `/api/web_fetch`), resolves the credential per operation through
+ * `ctx.credentials`, and classifies failures as WebError codes.
+ *
+ * It deliberately writes NO session events. The built-in
+ * `web/deepseek-search-llm-request` event belongs to the first-party DeepSeek
+ * search provider and its released-v0 payload is frozen to that provider's
+ * request body; recording an Ollama body under that name made every v0-format
+ * session containing it fail the released v0→v1 migration and become
+ * unopenable. Out-of-repo plugins cannot register their own required event
+ * type either (`SessionEventMap` extensions are not in the build-static
+ * known-type set), so the provider stays out of the session log.
  *
  * Wire calls:
  *   POST {baseURL}{searchPath}   body: { query, max_results? }
@@ -16,14 +24,19 @@
  *     -> { title, content, links }
  *
  * Config (loader entry `config` / settings section `web-search-ollama`):
- *   baseURL        - Ollama API root.        Default https://ollama.com
- *   searchPath     - search endpoint path.   Default /api/web_search
- *   fetchPath      - fetch endpoint path.   Default /api/web_fetch
- *   apiKeyEnv      - credential ref.         Default OLLAMA_API_KEY
- *   apiKey         - literal key (secret).   Default none
- *   apiVersion     - audit-event API version label. Default v1
- *   snippetMax     - cap on search snippet.  Default 2000
- *   fetchTimeoutMs - fetch abort timeout.    Default 15000
+ *   baseURL             - Ollama API root.        Default https://ollama.com
+ *   searchPath          - search endpoint path.   Default /api/web_search
+ *   fetchPath           - fetch endpoint path.   Default /api/web_fetch
+ *   apiKeyEnv           - credential ref.         Default OLLAMA_API_KEY
+ *   apiKey              - literal key (secret).   Default none
+ *   apiVersion          - retained, no longer used (was the audit-event label).
+ *   snippetMax          - cap on search snippet.  Default 2000
+ *   searchTimeoutMs     - search abort timeout.   Default 30000
+ *   fetchTimeoutMs      - fetch abort timeout.    Default 15000
+ *   enableFetchProvider - register the Ollama fetch provider. Default false
+ *                         (the built-in generic `http` fetch provider is the
+ *                         documented choice; registering both can make the seam
+ *                         refuse auto-selection).
  */
 
 import Schema from '@deepseek-ai/schemastery';
@@ -45,8 +58,9 @@ const DEFAULT_BASE_URL = 'https://ollama.com';
 const DEFAULT_SEARCH_PATH = '/api/web_search';
 const DEFAULT_FETCH_PATH = '/api/web_fetch';
 const DEFAULT_SNIPPET_MAX = 2000;
+const DEFAULT_SEARCH_TIMEOUT_MS = 30000;
 const DEFAULT_FETCH_TIMEOUT_MS = 15000;
-/** API generation label recorded in the audit event payload (Ollama has no version header). */
+/** Retained default for the now-unused `apiVersion` field (see the module header). */
 const DEFAULT_API_VERSION = 'v1';
 
 const ConfigSchema = Schema.object({
@@ -58,12 +72,21 @@ const ConfigSchema = Schema.object({
   baseURL: Schema.string().default(DEFAULT_BASE_URL),
   searchPath: Schema.string().default(DEFAULT_SEARCH_PATH),
   fetchPath: Schema.string().default(DEFAULT_FETCH_PATH),
-  /** Audit-event API version label (informational; Ollama has no version header). */
+  /** Retained for config compatibility; the plugin no longer writes session events. */
   apiVersion: Schema.string().default(DEFAULT_API_VERSION),
   /** Cap on the per-source snippet length (search). */
   snippetMax: Schema.number().step(1).min(1).default(DEFAULT_SNIPPET_MAX),
+  /** Abort timeout for search operations (ms). */
+  searchTimeoutMs: Schema.number().step(1).min(1).default(DEFAULT_SEARCH_TIMEOUT_MS),
   /** Abort timeout for fetch operations (ms). */
   fetchTimeoutMs: Schema.number().step(1).min(1).default(DEFAULT_FETCH_TIMEOUT_MS),
+  /**
+   * Register the Ollama fetch provider on `ctx.web`. Off by default: the
+   * built-in generic `http` fetch provider covers public URLs, and registering
+   * two usable fetch providers makes the seam refuse auto-selection unless
+   * `fetchProvider` is pinned explicitly.
+   */
+  enableFetchProvider: Schema.boolean().default(false),
 });
 
 type Config = ReturnType<typeof ConfigSchema>;
@@ -75,10 +98,28 @@ interface ResolveOptions {
   baseURL: string;
   searchPath: string;
   fetchPath: string;
-  apiVersion: string;
   snippetMax: number;
+  searchTimeoutMs: number;
   fetchTimeoutMs: number;
-  recordRequest: (payload: any) => void;
+}
+
+/** The launcher's immutable launch-environment snapshot, when the host provided one. */
+interface LaunchEnvironmentLike {
+  get(name: string): { readonly value: string } | undefined;
+}
+
+/**
+ * Resolve one ambient variable the way the harness does: the launcher's
+ * launch-environment snapshot (process / project `.env` / `$DSH_HOME/.env`)
+ * first, then this process's own environment as a fallback for hosts that did
+ * not fill the slot.
+ */
+function ambientEnv(ctx: Context, name: string): string | undefined {
+  const snapshot = ctx.get('launchEnvironment') as LaunchEnvironmentLike | undefined;
+  const resolved = snapshot?.get?.(name)?.value;
+  if (resolved != null && resolved.length > 0) return resolved;
+  const ambient = process.env[name];
+  return ambient != null && ambient.length > 0 ? ambient : undefined;
 }
 
 /**
@@ -96,29 +137,23 @@ function resolveOptions(ctx: Context, config: Config): ResolveOptions {
         try {
           const hit = await credentials.resolve(apiKeyEnv);
           if (hit?.value != null && hit.value.length > 0) return hit.value;
-        } catch { /* fall through to process environment */ }
+        } catch { /* fall through to the launch environment */ }
       }
-      const ambient = process.env[apiKeyEnv];
-      return ambient != null && ambient.length > 0 ? ambient : undefined;
+      return ambientEnv(ctx, apiKeyEnv);
     },
     apiKeyEnv,
     baseURL: config.baseURL ?? DEFAULT_BASE_URL,
     searchPath: config.searchPath ?? DEFAULT_SEARCH_PATH,
     fetchPath: config.fetchPath ?? DEFAULT_FETCH_PATH,
-    apiVersion: typeof config.apiVersion === 'string' && config.apiVersion.length > 0
-      ? config.apiVersion
-      : DEFAULT_API_VERSION,
     snippetMax: Number.isInteger(config.snippetMax) && config.snippetMax > 0
       ? config.snippetMax
       : DEFAULT_SNIPPET_MAX,
+    searchTimeoutMs: Number.isInteger(config.searchTimeoutMs) && config.searchTimeoutMs > 0
+      ? config.searchTimeoutMs
+      : DEFAULT_SEARCH_TIMEOUT_MS,
     fetchTimeoutMs: Number.isInteger(config.fetchTimeoutMs) && config.fetchTimeoutMs > 0
       ? config.fetchTimeoutMs
       : DEFAULT_FETCH_TIMEOUT_MS,
-    recordRequest: (payload) => {
-      try {
-        ctx.get('agents')?.currentInitiator()?.session?.append?.('web/deepseek-search-llm-request', payload);
-      } catch { /* best-effort audit logging */ }
-    },
   };
 }
 
@@ -245,19 +280,24 @@ class OllamaSearchProvider implements WebSearchProvider {
       // Ollama: max_results default 5, max 10 — the seam truncates regardless.
       payload.max_results = Math.min(request.maxResults, 10);
     }
-    o.recordRequest?.({ endpoint, apiVersion: o.apiVersion, body: payload });
     throwIfAborted(signal, 'Ollama web search');
+    const timeoutSignal = AbortSignal.timeout(o.searchTimeoutMs);
+    const abortSignal = signal !== undefined ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
     let response: Response;
     try {
       response = await fetch(endpoint, {
         method: 'POST',
         headers: authHeaders(apiKey),
         body: JSON.stringify(payload),
-        signal,
+        signal: abortSignal,
       });
     } catch (error) {
       const err = error as unknown;
-      if (signal?.aborted === true || isAbortError(err)) throw aborted('Ollama web search', signal, err);
+      if (signal?.aborted === true) throw aborted('Ollama web search', signal, err);
+      if (timeoutSignal.aborted === true) {
+        throw new WebError(`Ollama web search timed out after ${o.searchTimeoutMs}ms`, 'WEB_PROVIDER_ERROR', { cause: err });
+      }
+      if (isAbortError(err)) throw aborted('Ollama web search', abortSignal, err);
       throw new WebError(`Ollama web search request failed: ${String(err)}`, 'WEB_PROVIDER_ERROR', { cause: err });
     }
     if (!response.ok) {
@@ -321,7 +361,6 @@ class OllamaFetchProvider implements WebFetchProvider {
     throwIfAborted(signal, 'Ollama web fetch');
     const endpoint = `${o.baseURL.replace(/\/+$/, '')}${o.fetchPath}`;
     const payload: Record<string, any> = { url: request.url };
-    o.recordRequest?.({ endpoint, apiVersion: o.apiVersion, body: payload });
     // Combine abort signals: user signal + timeout
     const timeoutSignal = AbortSignal.timeout(o.fetchTimeoutMs);
     const abortSignal = signal !== undefined ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
@@ -335,10 +374,11 @@ class OllamaFetchProvider implements WebFetchProvider {
       });
     } catch (error) {
       const err = error as unknown;
-      if (abortSignal?.aborted === true || isAbortError(err)) throw aborted('Ollama web fetch', abortSignal, err);
-      if (err instanceof Error && err.name === 'TimeoutError') {
+      if (signal?.aborted === true) throw aborted('Ollama web fetch', signal, err);
+      if (timeoutSignal.aborted === true) {
         throw new WebError(`Ollama web fetch timed out after ${o.fetchTimeoutMs}ms`, 'WEB_PROVIDER_ERROR', { cause: err });
       }
+      if (isAbortError(err)) throw aborted('Ollama web fetch', abortSignal, err);
       throw new WebError(`Ollama web fetch request failed: ${String(err)}`, 'WEB_PROVIDER_ERROR', { cause: err });
     }
     if (!response.ok) {
@@ -374,7 +414,14 @@ function apply(ctx: Context, config: Config) {
     });
   });
   ctx.web.registerSearchProvider(new OllamaSearchProvider(() => resolveOptions(ctx, current())));
-  ctx.web.registerFetchProvider(new OllamaFetchProvider(() => resolveOptions(ctx, current())));
+  // Off by default (see `enableFetchProvider`): the built-in generic `http`
+  // fetch provider is the documented choice, and a second usable fetch
+  // provider makes the seam refuse auto-selection unless `fetchProvider` is
+  // pinned explicitly. Registration is structural, so this reads the loader
+  // config, not the hot-reloadable settings source.
+  if (config.enableFetchProvider === true) {
+    ctx.web.registerFetchProvider(new OllamaFetchProvider(() => resolveOptions(ctx, current())));
+  }
 }
 
 export { ConfigSchema as Config };
