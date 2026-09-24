@@ -2,6 +2,24 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [0.1.8] - 2026-09-24
+
+对照上游公开文档重新审核，把宿主半改写为**官方推荐写法**，不再保留自造的适配层。审核依据：`docs/cookbook/adding-a-settings-card.md`、`docs/subsystems/settings.md`、`docs/subsystems/web.md`、`docs/user/develop/basic/*`、`packages/boot/app-boot/README.md`（peer 校验规则）、`packages/boot/plugin-manager/README.md`（版本豁免）。
+
+### Changed
+
+- **Config 类型 = 官方形状**：`export interface Config` + 每个可编辑字段 `Volatile<T>`（`get()` 读实时值），`apply(ctx, config)` 内每次操作先 `snapshot(config)` 把全部实时字段读一次（官方原文：read `.get()` when starting an operation / 一次请求只用一份一致快照）。删掉自造的 `unwrap()`、`unwrapConfig()` 与条件类型推导。
+- **导出 = 官方模块形状**：改用具名导出（`Config` / `name` / `inject` / `apply`，与 in-tree 插件一致），移除 `default` 导出。loader 的 `unwrapExports()` 只在模块**存在** `default` 时才收敛为它；具名模块的整个命名空间对 harness 可见，因此不再需要「把 Config 挂到 default 上」这种补救。
+- **peerDependencies 对齐官方范围语义**：删除已不再导入的 `@deepseek-ai/dsh-settings`；`@deepseek-ai/dsh-web` 从 `^0.1.2-rc.1` 收敛为 **`>=0.1.7-rc.1 <0.2.0`**。旧范围在 prerelease 参与匹配的规则下会放行 0.1.2–0.1.6，而那些核心没有 0.1.7 的 Config/volatile 机制 —— 会静默失效；官方在**组合期**校验每个声明的 dsh peer 范围，现在声明与运行期一致（校验规则见 app-boot README §profiles）。
+- `pnpm-lock.yaml` 随之刷新（importer 记录新的 peer 解析结果）。
+- 测试同步：`test.mjs` 支持官方具名模块形状；`test-providers.mjs` 新增 `config()` 助手，按 harness 的方式传实时 ref、并按 schema 补默认值。
+
+### Notes
+
+- 官方文档确认、本插件**原本就符合**的约定：`available()` 只做本地廉价检查（不联网）；`truncated` 由 seam 设置（provider 返回 `false`）；`maxResults` 在请求层做成本优化、边界仍由 seam 强制；`role('secret')` 字段不进表单响应；结构性字段（`enableFetchProvider`）不标 volatile 因而**不进**配置表单；错误码使用官方 seam 词汇（`WEB_PROVIDER_ERROR` / `WEB_ABORTED`），自定义码被允许；插件包未声明 `dsh.bundle`（库而非 bundle），与官方一致。
+- 仍保留两个**本地 type shim**（`live()` 的 `volatile()` 存在性保护、本地 `Volatile<T>` 接口声明）：monorepo devDeps 仍在 schemastery 3.18.1 / cordis 4.0.2 / dsh-web 0.1.2-rc.1，尚未进入 0.1.7 区间；运行期解析的是 harness 自带的 3.18.4 / 4.0.4，语义不受影响。devDeps 升级后可按源码 TODO 删除。
+- 审核结论与逐条对照见 `docs/official-alignment-audit.md`。
+
 ## [0.1.7] - 2026-09-24
 
 v0.1.6 的后续补丁：**停用浏览器半**。宿主半在 0.1.7 下已正常工作，但客户端卡片仍卡在 pending —— harness 0.1.7 把浏览器端配置机制从 `settingsScope` 换成了 `configForms` + `plugins.item` 插槽，手写 bundle 不再适配。
@@ -137,6 +155,7 @@ v0.1.6 的后续补丁：**停用浏览器半**。宿主半在 0.1.7 下已正�
 - 默认联网搜索从内置 DeepSeek 搜索切换到 Ollama 云端（需配置 `OLLAMA_API_KEY`；内置 `web-search-deepseek` 默认停用）。
 - host 插件由本地文件加载改为正式 npm 包 `dsh-web-search-ollama`（peerDependencies：`dsh-settings`、`dsh-web`；dependencies：`schemastery`）。
 
+[0.1.8]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.8
 [0.1.7]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.7
 [0.1.6]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.6
 [0.1.5]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.5
