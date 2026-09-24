@@ -2,6 +2,22 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [0.1.6] - 2026-09-24
+
+适配 DSH **0.1.7-rc.1**：官方移除了 `SettingsForms.installSection`（配置节不再由插件自己安装，改由 loader 条目 schema 自动生成），未适配的插件在启动日志里抛 `settingsCtx.settings.installSection is not a function`，Ollama 搜索 provider 静默不注册。
+
+### Fixed
+
+- **配置节注册失败（严重）**：`settingsCtx.settings.installSection(...)` 在 0.1.7-rc.1 已不存在，`apply` 抛出 TypeError，provider 注册语句永远执行不到。现改为官方 0.1.7 机制：可编辑字段标 `volatile()`，每次操作经 `unwrapConfig()` 读取实时值 → 保存后即时生效（与旧 `installSection` 的 `setSource` 行为对齐）。
+- **schema 对 harness 不可见（严重）**：loader 的 `unwrapExports` 只取模块的 `default` 导出，而本插件的 `Config` 此前只有具名导出 → 条目没有 schema：既拿不到 volatile 实时值，也不会出现在 `settings.describe` 中，Web UI 配置卡片显示“命名空间不可用”。现把 `Config` 一并挂在 default 导出对象上。
+
+### Changed
+
+- 删除对 `@deepseek-ai/dsh-settings` 的导入（0.1.7 已无该 API）；`Context.settings` augmentation 与旧 type shim 一并移除。
+- `volatile()` 由本地 `live()` 包装：monorepo devDep 的 schemastery（3.18.1）尚无该标记时退化为普通值（模块仍可加载，`pnpm test` 不受影响）；harness 自带的 3.18.4 下为实时 ref。
+- `enableFetchProvider` 保持非 volatile：fetch provider 的注册是结构性的，改它需要重载。
+- **运行时要求：`@deepseek-ai/dsh` ≥ 0.1.7-rc.1**（已在 0.1.7-rc.1 实测）。按兼容发布处理，`peerDependencies` 不收紧；旧版本（≤ v0.1.5）的 tag 与 release 保留可回退。
+
 ## [0.1.5] - 2026-09-10
 
 修复性升级：**停止写入会话事件**（历史遗留 v0 会话打不开的根因）、修正超时分类、搜索补齐超时、凭证解析对齐启动环境、Ollama fetch provider 改为可选注册。
@@ -107,6 +123,7 @@
 - 默认联网搜索从内置 DeepSeek 搜索切换到 Ollama 云端（需配置 `OLLAMA_API_KEY`；内置 `web-search-deepseek` 默认停用）。
 - host 插件由本地文件加载改为正式 npm 包 `dsh-web-search-ollama`（peerDependencies：`dsh-settings`、`dsh-web`；dependencies：`schemastery`）。
 
+[0.1.6]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.6
 [0.1.5]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.5
 [0.1.4]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.4
 [0.1.3]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.3
