@@ -2,6 +2,20 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [0.1.7] - 2026-09-24
+
+v0.1.6 的后续补丁：**停用浏览器半**。宿主半在 0.1.7 下已正常工作，但客户端卡片仍卡在 pending —— harness 0.1.7 把浏览器端配置机制从 `settingsScope` 换成了 `configForms` + `plugins.item` 插槽，手写 bundle 不再适配。
+
+### Changed
+
+- **浏览器半（`dsh-web-search-ollama-client`）停用**：harness 0.1.7 移除了客户端 `settingsScope` 服务，该条目永远 `pending`，Web UI 启动时提示 `web boot: 1 entry did not activate`。`scripts/install.sh` 与 `profile/cordis.patch.yml` 不再安装/挂载它；包保留在仓库（v0.1.7 之前可用、可回退）。
+- **配置入口改为内置自动生成表单**：宿主半的 `Config` schema 现在对 harness 可见（v0.1.6 修复），内置插件管理器按 schema 在「设置 → 插件设置 → 插件配置」生成 `web-search-ollama` 表单（`autoGenerate: true`，`applies: live`），字段与旧卡片一致且保存即时生效；不再需要维护手写浏览器代码（这是该机制第二次因升级而失效，故不再自建）。
+- `peerDependencies` 未收紧；最低核心版本仍为 **≥ 0.1.7-rc.1**，旧版本（≤ v0.1.6）tag/release 保留可回退。
+
+### Notes
+
+- 想恢复自定义卡片，需要按 0.1.7 客户端契约重写：`inject = ["slots","locale","remote","remote.credentials","configForms"]`，用 `ctx.configForms.get('web-search-ollama')` 取表单、`ctx.slots.register({name:'plugins.item', ...})` 注册，控件用 `@deepseek-ai/dsh-client-ui-primitives` 的 `SettingsForm` / `SettingsValueField` / `SettingsSecretField`，并在 `package.json` 的 `dsh.client.inject` 里声明依赖包。
+
 ## [0.1.6] - 2026-09-24
 
 适配 DSH **0.1.7-rc.1**：官方移除了 `SettingsForms.installSection`（配置节不再由插件自己安装，改由 loader 条目 schema 自动生成），未适配的插件在启动日志里抛 `settingsCtx.settings.installSection is not a function`，Ollama 搜索 provider 静默不注册。
@@ -123,6 +137,7 @@
 - 默认联网搜索从内置 DeepSeek 搜索切换到 Ollama 云端（需配置 `OLLAMA_API_KEY`；内置 `web-search-deepseek` 默认停用）。
 - host 插件由本地文件加载改为正式 npm 包 `dsh-web-search-ollama`（peerDependencies：`dsh-settings`、`dsh-web`；dependencies：`schemastery`）。
 
+[0.1.7]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.7
 [0.1.6]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.6
 [0.1.5]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.5
 [0.1.4]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.4
