@@ -1,25 +1,25 @@
 # dsh-web-search-ollama
 
-Ollama 云端搜索 / 抓取插件，用于 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DSH）的 `ctx.web` seam：把模型的联网搜索能力从官方 DeepSeek 搜索切换到 **Ollama 云端 API**（`/api/web_search` + `/api/web_fetch`），并在 **Web GUI 的「插件设置 → 插件配置」页**提供可视化配置卡片（修改即时生效，无需重启）。
+Ollama 云端搜索 / 抓取插件，用于 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DSH）的 `ctx.web` seam：把模型的联网搜索能力从官方 DeepSeek 搜索切换到 **Ollama 云端 API**（`/api/web_search` + `/api/web_fetch`），并在 **Web GUI 的「插件设置 → 插件配置」页**提供配置表单（harness 依据宿主半的 schema 自动生成；保存即时生效、无需重启）。
 
 ## 特性
 
 - 🔍 **搜索 + 抓取**：注册 `searchProvider`（默认）与可选 `fetchProvider`（`POST {baseURL}{searchPath}` / `{baseURL}{fetchPath}`）。
-- 🎛️ **可视化配置**：浏览器端配置卡片（8 个字段：API 地址、密钥、路径、超时等），保存即热更新 `settings.yaml`。
+- 🎛️ **可视化配置**：8 个字段（API 地址、密钥、路径、超时等）由内置插件管理器按 schema 渲染成表单，保存即生效（**0.1.7 起不再自带浏览器 bundle**，见下文「架构」）。
 - 🔐 **密钥安全**：API Key 只写不读、不回显；支持从凭据 / 启动环境（`apiKeyEnv`）读取。
-- 📦 **零构建**：两个包均为纯 JS / 手写 ModuleLoader bundle，无需编译。
-- ♻️ **热重载**：改 `cordis.patch.yml` 后 loader 自动 diff 重新加载；改 client bundle 后刷新页面即生效。
+- 📦 **零构建**：宿主包为纯 JS（`tsc` 产物入库），装上即用。
+- ♻️ **热重载**：改 `cordis.patch.yml` 后 loader 自动 diff 重新加载；配置表单保存由 settings 服务即时下发。
 
-## 架构：为什么是两个包
+## 架构：宿主半 + （已停用的）浏览器半
 
-DSH 的插件分两个运行端，本插件拆成两个 npm 包（都必需）：
+本插件拆成两个 npm 包：
 
 | 包 | 运行端 | 职责 |
 |---|---|---|
 | `dsh-web-search-ollama` | **host**（Node.js 进程） | 注册搜索 provider（抓取 provider 可选）、安装 `web-search-ollama` settings 命名空间 |
-| `dsh-web-search-ollama-client` | **client**（浏览器） | 在「插件配置」页注册配置卡片（经 `settings.plugin.item` slot） |
+| `dsh-web-search-ollama-client` | **client**（浏览器） | **0.1.7 起停用**：其注入的客户端 `settingsScope` 服务已被 `configForms` 取代，条目会一直 pending |
 
-client 包**必须**以包名形式存在于 profile 的 node_modules（其 `package.json` 声明 `exports["./client"]` + `dsh.client`），`dsh-client-modules` 才能扫描到并注入浏览器。因此插件列表页会看到两个条目：`web-search-ollama` 与 `web-search-ollama-client`——这是架构使然，不是重复加载。
+> **v0.1.7 起浏览器半停用。** harness 0.1.7 把浏览器端配置机制从 `settingsScope` 换成 `configForms` + `plugins.item` 插槽，手写 bundle 不再适配（症状：`web boot: 1 entry did not activate`）。而宿主半的 `Config` schema 现在会被 harness 自动投影成「插件配置」页的表单（`autoGenerate: true`、`applies: live`），字段与旧卡片一致——功能等价，且不必再维护浏览器代码。因此 `scripts/install.sh` 与示例 patch 都不再安装/挂载 `dsh-web-search-ollama-client`（包保留在仓库，供回退或日后按新契约移植）。插件列表页现在只有 `web-search-ollama` 一个条目。
 
 ## 目录结构
 
@@ -38,10 +38,10 @@ dsh-web-search-ollama/
     │   ├── package.json
     │   ├── index.js                    # 插件本体（搜索/抓取 provider）
     │   └── test.mjs                    # 模块形状测试
-    └── dsh-web-search-ollama-client/   # client 包
+    └── dsh-web-search-ollama-client/   # client 包（0.1.7 起停用，保留供回退/移植）
         ├── package.json
         ├── index.js                    # host half（空 apply，仅占位）
-        └── client.js                   # 浏览器 bundle（配置卡片）
+        └── client.js                   # 旧浏览器 bundle（依赖已移除的 settingsScope）
 ```
 
 ## 快速开始
@@ -59,7 +59,7 @@ dsh-web-search-ollama/
 ```
 
 脚本会：
-1. 把两个包复制到 `$DSH_HOME/profiles/node_modules/`；
+1. 把宿主包复制到 `$DSH_HOME/profiles/node_modules/`；
 2. 把 `profile/cordis.patch.yml` 合并进 `$DSH_HOME/profiles/<profile>/cordis.patch.yml`（已有条目则跳过；改动前自动备份）。
 
 **方式 B — pnpm workspace 链接**
@@ -70,11 +70,9 @@ dsh-web-search-ollama/
 
 ```bash
 DSH_HOME=${DSH_HOME:-$HOME/.dsh}
-mkdir -p "$DSH_HOME/profiles/node_modules/dsh-web-search-ollama" \
-         "$DSH_HOME/profiles/node_modules/dsh-web-search-ollama-client"
+mkdir -p "$DSH_HOME/profiles/node_modules/dsh-web-search-ollama"
 cp packages/dsh-web-search-ollama/index.js       packages/dsh-web-search-ollama/package.json \
    "$DSH_HOME/profiles/node_modules/dsh-web-search-ollama/"
-cp packages/dsh-web-search-ollama-client/*       "$DSH_HOME/profiles/node_modules/dsh-web-search-ollama-client/"
 ```
 
 ### 2. 配置 loader patch
@@ -99,14 +97,13 @@ cp packages/dsh-web-search-ollama-client/*       "$DSH_HOME/profiles/node_module
         fetchPath: /api/web_fetch
         apiKeyEnv: OLLAMA_API_KEY
         # enableFetchProvider: true        # 如需 Ollama 也接管抓取，打开并把上面的 fetchProvider 改为 ollama
-    - id: web-search-ollama-client
-      name: 'dsh-web-search-ollama-client'   # client 包
+    # （浏览器半已停用，不再挂载：harness 0.1.7 起由内置表单接管配置）
 ```
 
 ### 3. 配置密钥（二选一）
 
 - **环境变量**（推荐）：设置 `OLLAMA_API_KEY`，patch 的 `config.apiKeyEnv` 默认指向它；
-- **UI 填写**：设置 → 插件设置 → 插件配置 → **Ollama 网页搜索** → 填入 API Key → 保存（密钥只写不读）。
+- **UI 填写**：设置 → 插件设置 → 插件配置 → **web-search-ollama** → 填 `baseURL` 等字段（`apiKey` 建议留空，交给 `apiKeyEnv`）→ 保存。
 
 ### 4. 启动 / 生效
 
@@ -118,15 +115,14 @@ dsh web
 
 ### 5. 验证
 
-**插件已加载（应看到两个 active 条目）：**
+**插件已加载（只应看到一个 active 条目）：**
 
 ```bash
 curl -s -X POST http://127.0.0.1:3080/api/pluginInventory/list \
   -H 'Content-Type: application/json' \
   -d '{"type":"client-request","rpcId":"v","method":"pluginInventory/list","payload":{"args":{}}}'
-# 期望:
-#   web-search-ollama        moduleName=dsh-web-search-ollama        enabled=true
-#   web-search-ollama-client moduleName=dsh-web-search-ollama-client enabled=true
+# 期望（v0.1.7 起只有宿主半）:
+#   web-search-ollama moduleName=dsh-web-search-ollama enabled=true
 ```
 
 **settings 命名空间已注册：**
@@ -138,7 +134,7 @@ curl -s -X POST http://127.0.0.1:3080/api/settings.describe \
 # 期望: namespaces 中包含 "web-search-ollama"
 ```
 
-**UI 卡片**：设置 → 插件设置 → 插件配置 → 展开 **Ollama 网页搜索** 卡片，编辑字段后保存（`settings.yaml` 即时更新）。
+**配置表单**：设置 → 插件设置 → 插件配置 → 展开 **web-search-ollama**，编辑字段后保存（写入 profile 的 patch 文档，即时生效）。
 
 ## 配置项
 
@@ -159,8 +155,8 @@ curl -s -X POST http://127.0.0.1:3080/api/settings.describe \
 
 ## 卸载
 
-1. 从 `cordis.patch.yml` 删除 `web` 的 `searchProvider` 覆盖、`web-search-deepseek` 的 `disabled`、以及 `insert` 中的两个条目；
-2. 删除（或保留无害）`$DSH_HOME/profiles/node_modules/dsh-web-search-ollama/` 与 `.../dsh-web-search-ollama-client/`；
+1. 从 `cordis.patch.yml` 删除 `web` 的 `searchProvider` 覆盖、`web-search-deepseek` 的 `disabled`、以及 `insert` 中的条目；
+2. 删除（或保留无害）`$DSH_HOME/profiles/node_modules/dsh-web-search-ollama/`（若曾装过 `.../dsh-web-search-ollama-client/` 也可一并删除）；
 3. 重启 `dsh web`。
 
 ## 恢复历史会话（v0 → v3）
@@ -201,10 +197,10 @@ pnpm test             # 模块形状测试 + provider 行为测试（test.mjs + 
 
 | 现象 | 原因与处理 |
 |---|---|
-| 搜索不生效，配置页没有卡片 | host 或 client 包未装入 profile node_modules；`pluginInventory.list` 看不到条目 → 重跑 `./scripts/install.sh` |
-| 配置页卡片显示"设置命名空间不可用" | `settings.describe` 里没有 `web-search-ollama` → host 包未 apply（检查 `pluginInventory.list` 中 `web-search-ollama` 是否 active / failed） |
-| 改了 client.js 页面没变化 | 刷新页面（`serveBundle` 每次读取磁盘，`cache-control: no-cache`；不必重启 dsh） |
-| 插件列表出现两个 ollama 条目 | 正常：host + client 两个 half，见上文「架构」 |
+| 搜索不生效，插件配置页没有该条目 | 宿主包未装入 profile node_modules；`pluginInventory/list` 看不到条目 → 重跑 `./scripts/install.sh` |
+| 配置页看不到 `web-search-ollama` 表单 | `settings/describe` 里没有该命名空间 → 宿主包未 apply，或它的 `Config` schema 对 harness 不可见（v0.1.6 起 `Config` 同时挂在 default 导出上；查 `pluginInventory/list` 中 `web-search-ollama` 是否 active） |
+| UI 启动提示 `web boot: 1 entry did not activate`（`dsh-web-search-ollama-client … waiting for service: settingsScope`） | harness 0.1.7 已移除客户端 `settingsScope` 服务；删掉 profile patch 里 `web-search-ollama-client` 的 `insert` 条目（v0.1.7 的 `install.sh` 不再添加）后重启 |
+| 插件列表出现两个 ollama 条目 | 旧安装残留：profile patch 里还挂着 `web-search-ollama-client` → 删掉该条目；v0.1.7 起只有一个宿主条目 |
 | **旧会话打不开，报 `web/deepseek-search-llm-request … body has unexpected member "query"`** | v0.1.5 之前插件把 Ollama 请求写成官方事件，导致含该事件的 **v0 格式**会话无法通过 v0→v1 迁移。升级到 v0.1.5（不再写任何会话事件）即可止住新增；**已在磁盘上的历史 v0 会话需要单独做一次性 v0→v3 迁移**，升级插件本身不会修复它们。 |
 | **macOS 上用云端 `https://ollama.com` 搜索超时 / `UND_ERR_CONNECT_TIMEOUT`，但 `nslookup` 正常** | 本机 `getaddrinfo` 对该域名的缓存异常（某些网络环境会恰好卡 ~30s）。执行 `sudo dscacheutil -flushcache && sudo killall -HUP mDNSResponder` 即可（仅清空本地 DNS 缓存，安全可逆，无需改 `/etc/hosts`）。若反复出现，建议改用自建 Ollama（`baseURL` 填 `http://localhost:11434`） |
 

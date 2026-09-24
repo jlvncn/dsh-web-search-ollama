@@ -3,18 +3,21 @@
 #
 # Merge this file's entries into your profile's cordis.patch.yml
 # ($DSH_HOME/profiles/<profile>/cordis.patch.yml), or let scripts/install.sh
-# do it for you. The two halves below are BOTH required:
+# do it for you.
 #
-#   web-search-ollama          host half   — registers the Ollama search &
-#                                            fetch providers on ctx.web
-#   web-search-ollama-client   client half — registers the configuration
-#                                            card in the Web UI settings page
-#                                            (must be a package name so the
-#                                            client-modules scanner finds it)
+#   web-search-ollama          host half — registers the Ollama search &
+#                                          fetch providers on ctx.web. Its
+#                                          Config schema is what the built-in
+#                                          plugin manager renders as the
+#                                          "插件配置" form (harness >= 0.1.7).
 #
-# Requires the two packages to be installed under the profile's node_modules:
+# The browser half (dsh-web-search-ollama-client) is RETIRED on harness
+# >= 0.1.7: the client-side `settingsScope` service it injected no longer
+# exists, so the entry stays pending and the client reports "1 entry did not
+# activate". Do not mount it here; the generated form covers the same fields.
+#
+# Requires the package to be installed under the profile's node_modules:
 #   $DSH_HOME/profiles/node_modules/dsh-web-search-ollama/
-#   $DSH_HOME/profiles/node_modules/dsh-web-search-ollama-client/
 # =============================================================================
 
 # Use the Ollama-backed search provider instead of the built-in DeepSeek one.
@@ -47,9 +50,4 @@
         fetchPath: /api/web_fetch
         apiKeyEnv: OLLAMA_API_KEY
 
-    # Browser half: registers the "web-search-ollama" card in the Web UI
-    # plugin-configuration tab. Must be mounted as a package name (resolvable
-    # from the profile's node_modules) for the client-modules scanner to
-    # discover its client bundle.
-    - id: web-search-ollama-client
-      name: 'dsh-web-search-ollama-client'
+    # (browser half retired on harness >= 0.1.7 — see the header)

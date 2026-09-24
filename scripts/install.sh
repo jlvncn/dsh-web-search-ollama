@@ -2,8 +2,12 @@
 # =============================================================================
 # dsh-web-search-ollama — install into a DeepSeek Harness profile
 #
-# Copies the two plugin packages (host + client) into the profile's hoisted
-# node_modules and merges the loader patch into cordis.patch.yml.
+# Copies the host plugin package into the profile's hoisted node_modules and
+# merges the loader patch into cordis.patch.yml.
+#
+# The browser half (dsh-web-search-ollama-client) is no longer installed: its
+# client-side `settingsScope` service was removed in harness 0.1.7, and the
+# built-in plugin manager now renders the entry's Config schema itself.
 #
 # Usage:
 #   ./scripts/install.sh            # install into the default "web" profile
@@ -33,12 +37,10 @@ mkdir -p "$NM_DIR/dsh-web-search-ollama"
 cp "$HOST_PKG/index.js"       "$NM_DIR/dsh-web-search-ollama/index.js"
 cp "$HOST_PKG/package.json"   "$NM_DIR/dsh-web-search-ollama/package.json"
 
-# --- 2. client package -------------------------------------------------------
-echo "==> client package -> $NM_DIR/dsh-web-search-ollama-client"
-mkdir -p "$NM_DIR/dsh-web-search-ollama-client"
-cp "$CLIENT_PKG/index.js"     "$NM_DIR/dsh-web-search-ollama-client/index.js"
-cp "$CLIENT_PKG/client.js"    "$NM_DIR/dsh-web-search-ollama-client/client.js"
-cp "$CLIENT_PKG/package.json" "$NM_DIR/dsh-web-search-ollama-client/package.json"
+# --- 2. browser half: retired (harness >= 0.1.7) -----------------------------
+# An existing dsh-web-search-ollama-client/ copy under $NM_DIR is left alone but
+# is no longer mounted. Remove its `insert` entry from cordis.patch.yml if a
+# previous install added one.
 
 # --- 3. loader patch (cordis.patch.yml) --------------------------------------
 echo "==> loader patch    -> $PROFILE_DIR/cordis.patch.yml"
@@ -145,7 +147,7 @@ fi
 
 echo
 echo "==> Done. Restart dsh web (or hot-reload the patch), then configure:"
-echo "    设置 → 插件设置 → 插件配置 → Ollama 网页搜索"
+echo "    设置 → 插件设置 → 插件配置 → web-search-ollama（内置插件管理器按 schema 生成的表单）"
 echo
 echo "    Verify the loader picked both halves up:"
 echo "    curl -s -X POST http://127.0.0.1:3080/api/pluginInventory/list \\"
