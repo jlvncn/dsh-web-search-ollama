@@ -2,6 +2,29 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [0.1.9] - 2026-09-24
+
+宿主半改成 **bundle**（可被 `dsh plugin` / Web 的 Plugins 页直接安装与管理），并清掉 0.1.8 审核时「有意保留」的两个本地 type shim —— 源码现在是**逐字官方写法**。这一步由一次真机实测驱动：把包以链接方式装进临时 profile 后，**配置表单静默消失**，根因是包自己解析到旧的 schemastery 3.18.1（没有 `volatile()`）。
+
+### Added
+
+- **bundle 形态**：`packages/dsh-web-search-ollama/cordis.patch.yml` + `package.json` 的 `dsh.bundle.patch`（并把 patch 纳入 `files`/`exports`）。装上即挂载自己的行；**不抢 `web` seam**（provider 选择仍由用户层决定）。
+- **免 npm 的三条安装通道**（实测认证）：`dsh plugin --profile <p> add <本地目录>`（link，离线可用）、tarball URL、git 地址。registry 包名仍需 npm 凭据。
+
+### Fixed
+
+- **链接安装下配置表单消失（静默）**：包声明 `@deepseek-ai/schemastery: ^3.18.1`，`^` 允许解析到没有 `volatile()` 的 3.18.1；以 `link:` 方式安装时 Node 优先用包自己的 `node_modules`，于是所有字段退化为普通值 → `volatileForm(schema)` 为空 → 该条目不进 `settings/describe`，而搜索仍正常（**只有表单消失**）。收敛为官方的 **`~3.18.4`** 后修复，并在临时 profile 复验（命名空间 + 8 个字段回归）。
+
+### Changed
+
+- **删除两个本地 type shim**（`live()` 的 `volatile()` 保护、本地 `Volatile<T>` 接口）：devDeps 升到 `@deepseek-ai/schemastery ~3.18.4` / `@deepseek-ai/cordis ~4.0.4` 后直接 `import type { Context, Volatile } from '@deepseek-ai/cordis'` 并链式 `.volatile()`。审核文档里那三条「有意保留偏差」现在只剩 2 条（都属可选项）。
+- 副本安装（`install.sh`）保留不变；profile patch 中的手写 `insert` 可迁移到 bundle 层（`dsh plugin add` 会自动写入依赖与 bundle 选择）。
+
+### Verified (2026-09-24)
+
+- 临时 profile：`dsh plugin --profile scratch add <本地目录>` → `link:` 依赖 + bundle 自动选中 → 组合树出现该行 → 启动后 `include:web-search-ollama` = `active`、无 pending、无诊断文件、`settings/describe` 含 `web-search-ollama`（`autoGenerate: true`，8 字段实时值）。
+- 本机：`tsc` + 形状测试 + 8/8 行为测试。
+
 ## [0.1.8] - 2026-09-24
 
 对照上游公开文档重新审核，把宿主半改写为**官方推荐写法**，不再保留自造的适配层。审核依据：`docs/cookbook/adding-a-settings-card.md`、`docs/subsystems/settings.md`、`docs/subsystems/web.md`、`docs/user/develop/basic/*`、`packages/boot/app-boot/README.md`（peer 校验规则）、`packages/boot/plugin-manager/README.md`（版本豁免）。
@@ -155,6 +178,7 @@ v0.1.6 的后续补丁：**停用浏览器半**。宿主半在 0.1.7 下已正�
 - 默认联网搜索从内置 DeepSeek 搜索切换到 Ollama 云端（需配置 `OLLAMA_API_KEY`；内置 `web-search-deepseek` 默认停用）。
 - host 插件由本地文件加载改为正式 npm 包 `dsh-web-search-ollama`（peerDependencies：`dsh-settings`、`dsh-web`；dependencies：`schemastery`）。
 
+[0.1.9]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.9
 [0.1.8]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.8
 [0.1.7]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.7
 [0.1.6]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.6
