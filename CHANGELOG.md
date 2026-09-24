@@ -2,6 +2,26 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [0.1.11] - 2026-09-25
+
+修正 v0.1.7 的判断错误：**0.1.7 并没有"由内置表单自动接管"**。行配置控件只在客户端插件注册键值插槽 `plugins.row.config`（键 = `<组合包名>#<行 id>`）时出现，描述符里的 `autoGenerate` 前端无人消费、没有兜底页。v0.1.7–v0.1.10 期间因此**配置表单在 UI 里没有任何入口**（命名空间仍在服务端提供，只是没人指向它）。本版把浏览器半按 0.1.7 契约重写并重新挂载。
+
+### Fixed
+
+- **配置表单在 Plugins 页无入口**：重写浏览器半 → `inject = ["slots", "locale", "configForms"]`；`ctx.configForms.whileServed(["web-search-ollama"], () => ctx.slots.inject("plugins.row.config", () => ctx.slots.register({ name: "plugins.row.config", key: "dsh-web-search-ollama#web-search-ollama" }, Card)))`。键与页面查找逻辑逐条对齐（页面用 `formFor(openRow.rowId)` 解析表单，`rowId` 正是本插件的命名空间 `web-search-ollama`）。
+- 表单用官方 `@deepseek-ai/dsh-client-ui-primitives`（`SettingsForm` / `SettingsValueField` / `SettingsSecretField`）渲染，写入走 `form.mutate(ops, revision)`（路径操作 + 修订栅栏），草稿本地暂存、保存才落盘。
+
+### Changed
+
+- 浏览器半同样以 **bundle** 分发（自带 `cordis.patch.yml` + `dsh.bundle.patch`），并在 `dsh.client.inject` 声明依赖的客户端包（`dsh-client-ui-plugin-manager`、`dsh-client-ui-primitives`）。
+- `scripts/install.sh` 恢复复制两个包（含各自的 `cordis.patch.yml`）；示例 patch 恢复两条 `insert`。
+- README/审核文档修正：说明 `autoGenerate` 无 UI 消费、`plugins.row.config` 才是入口，并补两条排查项。
+
+### Verified
+
+- 两个条目 `active`、无 pending、启动无诊断文件；`settings/describe` 含 `web-search-ollama`（8 字段）。
+- 渲染效果需在浏览器确认（本机浏览器工具不允许导航 loopback 地址）。
+
 ## [0.1.10] - 2026-09-25
 
 文档修正：**0.1.7 起可编辑的插件配置已不在 `设置 → 插件设置` 里**（该页现在是只读的插件清单，文案为「插件视图 / 内置插件 / 查看内置部署的插件列表」），配置表单迁到 **Web 侧边栏的 Plugins 页** —— 组合包 → 行 → 「配置」。
@@ -186,6 +206,7 @@ v0.1.6 的后续补丁：**停用浏览器半**。宿主半在 0.1.7 下已正�
 - 默认联网搜索从内置 DeepSeek 搜索切换到 Ollama 云端（需配置 `OLLAMA_API_KEY`；内置 `web-search-deepseek` 默认停用）。
 - host 插件由本地文件加载改为正式 npm 包 `dsh-web-search-ollama`（peerDependencies：`dsh-settings`、`dsh-web`；dependencies：`schemastery`）。
 
+[0.1.11]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.11
 [0.1.10]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.10
 [0.1.9]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.9
 [0.1.8]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.8
