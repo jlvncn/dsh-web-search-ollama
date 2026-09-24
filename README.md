@@ -193,6 +193,20 @@ pnpm test             # 模块形状测试 + provider 行为测试（test.mjs + 
 
 改动 host 包源码 `packages/dsh-web-search-ollama/src/index.ts` 后，运行 `npm run build --prefix packages/dsh-web-search-ollama` 重建 `index.js`，再运行 `./scripts/install.sh` 同步到 profile（或手动 `cp` 到 `$DSH_HOME/profiles/node_modules/dsh-web-search-ollama/`）。
 
+### 官方约定对照（插件作者）
+
+宿主半按官方 `docs/cookbook/adding-a-settings-card.md` 与 `docs/subsystems/web.md` 的形状编写；逐条审核结论见 [`docs/official-alignment-audit.md`](docs/official-alignment-audit.md)。
+
+| 官方约定 | 本插件 |
+|---|---|
+| 具名导出 `Config` / `name` / `inject` / `apply`（官方插件无 `default`） | ✅ 只用具名导出 |
+| 可编辑字段声明为 `Volatile<T>`，操作开始时 `.get()` 读一次快照 | ✅ `snapshot(config)` |
+| `role('secret')` 字段不进表单响应；凭证用 `apiKeyEnv` 引用 | ✅ |
+| `available()` 只做本地廉价检查（不联网） | ✅ |
+| `truncated` 由 seam 设置；`maxResults` 边界由 seam 强制 | ✅ provider 只做请求层优化 |
+| `peerDependencies` 声明支持的 dsh 范围（**组合期会校验**） | ✅ `>=0.1.7-rc.1 <0.2.0` |
+| 结构性字段不标 volatile ⇒ 不进配置表单 | ✅ `enableFetchProvider` |
+
 ## 故障排查
 
 | 现象 | 原因与处理 |
@@ -200,6 +214,7 @@ pnpm test             # 模块形状测试 + provider 行为测试（test.mjs + 
 | 搜索不生效，插件配置页没有该条目 | 宿主包未装入 profile node_modules；`pluginInventory/list` 看不到条目 → 重跑 `./scripts/install.sh` |
 | 配置页看不到 `web-search-ollama` 表单 | `settings/describe` 里没有该命名空间 → 宿主包未 apply，或它的 `Config` schema 对 harness 不可见（v0.1.6 起 `Config` 同时挂在 default 导出上；查 `pluginInventory/list` 中 `web-search-ollama` 是否 active） |
 | UI 启动提示 `web boot: 1 entry did not activate`（`dsh-web-search-ollama-client … waiting for service: settingsScope`） | harness 0.1.7 已移除客户端 `settingsScope` 服务；删掉 profile patch 里 `web-search-ollama-client` 的 `insert` 条目（v0.1.7 的 `install.sh` 不再添加）后重启 |
+| 插件行被组合期拒绝，报 `incompatible-version`（或该行被置为 `disabled`） | `peerDependencies` 里声明的 dsh 范围与运行期 `dsh --version` 不匹配（校验规则见 app-boot README §profiles）。换用与核心匹配的插件版本；确需放行要走 `dsh plugin --profile web allow-version <包@版本> --dsh-version <运行期版本> --accept-risk`（有风险，官方要求显式确认） |
 | 插件列表出现两个 ollama 条目 | 旧安装残留：profile patch 里还挂着 `web-search-ollama-client` → 删掉该条目；v0.1.7 起只有一个宿主条目 |
 | **旧会话打不开，报 `web/deepseek-search-llm-request … body has unexpected member "query"`** | v0.1.5 之前插件把 Ollama 请求写成官方事件，导致含该事件的 **v0 格式**会话无法通过 v0→v1 迁移。升级到 v0.1.5（不再写任何会话事件）即可止住新增；**已在磁盘上的历史 v0 会话需要单独做一次性 v0→v3 迁移**，升级插件本身不会修复它们。 |
 | **macOS 上用云端 `https://ollama.com` 搜索超时 / `UND_ERR_CONNECT_TIMEOUT`，但 `nslookup` 正常** | 本机 `getaddrinfo` 对该域名的缓存异常（某些网络环境会恰好卡 ~30s）。执行 `sudo dscacheutil -flushcache && sudo killall -HUP mDNSResponder` 即可（仅清空本地 DNS 缓存，安全可逆，无需改 `/etc/hosts`）。若反复出现，建议改用自建 Ollama（`baseURL` 填 `http://localhost:11434`） |

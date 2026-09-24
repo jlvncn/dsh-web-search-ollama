@@ -10,10 +10,10 @@
 let plugin, Config;
 try {
   const ns = await import('./index.js');
-  // CJS build: `default` is `module.exports` ({ Config, default: plugin });
-  // ESM build: `default` is the plugin itself. Accept both shapes.
-  plugin = ns.default?.default ?? ns.default;
-  Config = ns.Config ?? ns.default?.Config;
+  // Three shapes are legal: the official named-export module (`ns` itself), a
+  // `default` plugin object, and a CJS build wrapping either.
+  plugin = ns.default?.default ?? ns.default ?? ns;
+  Config = ns.Config ?? ns.default?.Config ?? ns.default?.default?.Config;
 } catch (error) {
   console.error('FAIL: cannot load the plugin module:', error.message);
   console.error('      Run `pnpm install` in the monorepo root, or run this');

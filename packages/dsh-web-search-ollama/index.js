@@ -26,18 +26,19 @@ const ConfigSchema = Schema.object({
     fetchTimeoutMs: live(Schema.number().step(1).min(1).default(DEFAULT_FETCH_TIMEOUT_MS)),
     enableFetchProvider: Schema.boolean().default(false),
 });
-function unwrap(value) {
-    return value !== null && typeof value === 'object'
-        && typeof value.get === 'function'
-        ? value.get()
-        : value;
-}
-function unwrapConfig(config) {
-    const source = config;
-    const out = {};
-    for (const key of Object.keys(source))
-        out[key] = unwrap(source[key]);
-    return out;
+function snapshot(config) {
+    return {
+        apiKey: config.apiKey.get(),
+        apiKeyEnv: config.apiKeyEnv.get(),
+        baseURL: config.baseURL.get(),
+        searchPath: config.searchPath.get(),
+        fetchPath: config.fetchPath.get(),
+        apiVersion: config.apiVersion.get(),
+        snippetMax: config.snippetMax.get(),
+        searchTimeoutMs: config.searchTimeoutMs.get(),
+        fetchTimeoutMs: config.fetchTimeoutMs.get(),
+        enableFetchProvider: config.enableFetchProvider,
+    };
 }
 function ambientEnv(ctx, name) {
     const snapshot = ctx.get('launchEnvironment');
@@ -307,10 +308,10 @@ class OllamaFetchProvider {
     }
 }
 function apply(ctx, config) {
-    ctx.web.registerSearchProvider(new OllamaSearchProvider(() => resolveOptions(ctx, unwrapConfig(config))));
-    if (unwrapConfig(config).enableFetchProvider === true) {
-        ctx.web.registerFetchProvider(new OllamaFetchProvider(() => resolveOptions(ctx, unwrapConfig(config))));
+    ctx.web.registerSearchProvider(new OllamaSearchProvider(() => resolveOptions(ctx, snapshot(config))));
+    if (config.enableFetchProvider === true) {
+        ctx.web.registerFetchProvider(new OllamaFetchProvider(() => resolveOptions(ctx, snapshot(config))));
     }
 }
 export { ConfigSchema as Config };
-export default { name, inject, Config: ConfigSchema, apply };
+export { name, inject, apply };

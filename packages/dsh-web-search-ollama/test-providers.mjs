@@ -12,7 +12,40 @@
 import assert from 'node:assert/strict';
 
 const pluginModule = await import('./index.js');
-const plugin = pluginModule.default;
+const plugin = pluginModule.default ?? pluginModule;
+
+/**
+ * Stand-in for the loader's Config. On harness >= 0.1.7 the loader hands every
+ * editable field over as a live ref with its schema default applied, so the
+ * helper seeds those defaults and wraps each editable field. `enableFetchProvider`
+ * is the one structural field and stays plain.
+ */
+const ConfigSchema = pluginModule.Config ?? pluginModule.default?.Config;
+/** Schema defaults, as the loader applies them before Config reaches `apply`. */
+const schemaDefaults = Object.fromEntries(
+  Object.entries(ConfigSchema?.dict ?? {}).map(([key, schema]) => [key, schema.meta?.default]),
+);
+const FALLBACK_DEFAULTS = {
+  apiKey: undefined,
+  apiKeyEnv: 'OLLAMA_API_KEY',
+  baseURL: 'https://ollama.com',
+  searchPath: '/api/web_search',
+  fetchPath: '/api/web_fetch',
+  apiVersion: 'v1',
+  snippetMax: 2000,
+  searchTimeoutMs: 30000,
+  fetchTimeoutMs: 15000,
+  enableFetchProvider: false,
+};
+
+function config(values = {}) {
+  const merged = { ...FALLBACK_DEFAULTS, ...schemaDefaults, ...values };
+  const out = {};
+  for (const [key, value] of Object.entries(merged)) {
+    out[key] = key === 'enableFetchProvider' ? value : { get: () => value };
+  }
+  return out;
+}
 
 /** Minimal Cordis-shaped context capturing what `apply` registers. */
 function makeCtx({ env = {}, credentials, agents } = {}) {
@@ -92,7 +125,7 @@ test('search: posts the Ollama body, maps sources, dedupes and caps', async () =
     ],
   }));
   const ctx = makeCtx();
-  plugin.apply(ctx, { baseURL: 'https://api.test/', apiKey: 'secret', snippetMax: 10 });
+  plugin.apply(ctx, config({ baseURL: 'https://api.test/', apiKey: 'secret', snippetMax: 10 }));
 
   const result = await ctx.web.searchProviders[0].search({ query: 'hello', maxResults: 20 });
 
@@ -110,7 +143,7 @@ test('search: writes NO session event (v0-corruption regression guard)', async (
   const agents = { currentInitiator: () => ({ session: { append: (...args) => appended.push(args) } }) };
   mockFetch(async () => jsonResponse({ results: [] }));
   const ctx = makeCtx({ agents });
-  plugin.apply(ctx, { baseURL: 'https://api.test', apiKey: 'k' });
+  plugin.apply(ctx, config({ baseURL: 'https://api.test', apiKey: 'k' }));
 
   await ctx.web.searchProviders[0].search({ query: 'q' });
 
@@ -120,7 +153,7 @@ test('search: writes NO session event (v0-corruption regression guard)', async (
 test('search: a timeout is WEB_PROVIDER_ERROR, not WEB_ABORTED', async () => {
   mockFetch(hangingFetch());
   const ctx = makeCtx();
-  plugin.apply(ctx, { baseURL: 'https://api.test', apiKey: 'k', searchTimeoutMs: 25 });
+  plugin.apply(ctx, config({ baseURL: 'https://api.test', apiKey: 'k', searchTimeoutMs: 25 }));
 
   await keepAliveWhile(assert.rejects(
     () => ctx.web.searchProviders[0].search({ query: 'q' }),
@@ -135,7 +168,7 @@ test('search: a timeout is WEB_PROVIDER_ERROR, not WEB_ABORTED', async () => {
 test('search: caller cancellation is WEB_ABORTED', async () => {
   mockFetch(hangingFetch());
   const ctx = makeCtx();
-  plugin.apply(ctx, { baseURL: 'https://api.test', apiKey: 'k', searchTimeoutMs: 5000 });
+  plugin.apply(ctx, config({ baseURL: 'https://api.test', apiKey: 'k', searchTimeoutMs: 5000 }));
 
   const controller = new AbortController();
   const pending = ctx.web.searchProviders[0].search({ query: 'q' }, controller.signal);
@@ -152,12 +185,12 @@ test('search: caller cancellation is WEB_ABORTED', async () => {
 
 test('provider registration: fetch is opt-in', async () => {
   const off = makeCtx();
-  plugin.apply(off, { baseURL: 'https://api.test', apiKey: 'k' });
+  plugin.apply(off, config({ baseURL: 'https://api.test', apiKey: 'k' }));
   assert.equal(off.web.searchProviders.length, 1);
   assert.equal(off.web.fetchProviders.length, 0, 'fetch provider must not register by default');
 
   const on = makeCtx();
-  plugin.apply(on, { baseURL: 'https://api.test', apiKey: 'k', enableFetchProvider: true });
+  plugin.apply(on, config({ baseURL: 'https://api.test', apiKey: 'k', enableFetchProvider: true }));
   assert.equal(on.web.fetchProviders.length, 1);
 });
 
@@ -165,7 +198,7 @@ test('credential: resolves the API key from the launch-environment snapshot', as
   fetchCalls = [];
   mockFetch(async () => jsonResponse({ results: [] }));
   const ctx = makeCtx({ env: { OLLAMA_API_KEY: 'from-env' } });
-  plugin.apply(ctx, { baseURL: 'https://api.test' });
+  plugin.apply(ctx, config({ baseURL: 'https://api.test' }));
 
   await ctx.web.searchProviders[0].search({ query: 'q' });
 
@@ -176,7 +209,7 @@ test('fetch (opt-in): maps the text body', async () => {
   fetchCalls = [];
   mockFetch(async () => jsonResponse({ content: 'page text' }));
   const ctx = makeCtx();
-  plugin.apply(ctx, { baseURL: 'https://api.test', apiKey: 'k', enableFetchProvider: true });
+  plugin.apply(ctx, config({ baseURL: 'https://api.test', apiKey: 'k', enableFetchProvider: true }));
 
   const result = await ctx.web.fetchProviders[0].fetch({ url: 'https://target.test' });
 
@@ -189,7 +222,7 @@ test('fetch (opt-in): maps the text body', async () => {
 test('fetch (opt-in): a timeout is WEB_PROVIDER_ERROR, not WEB_ABORTED', async () => {
   mockFetch(hangingFetch());
   const ctx = makeCtx();
-  plugin.apply(ctx, { baseURL: 'https://api.test', apiKey: 'k', enableFetchProvider: true, fetchTimeoutMs: 25 });
+  plugin.apply(ctx, config({ baseURL: 'https://api.test', apiKey: 'k', enableFetchProvider: true, fetchTimeoutMs: 25 }));
 
   await keepAliveWhile(assert.rejects(
     () => ctx.web.fetchProviders[0].fetch({ url: 'https://target.test' }),

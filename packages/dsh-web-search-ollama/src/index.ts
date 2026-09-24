@@ -48,8 +48,8 @@ import type { WebSearchProvider, WebSearchRequest, WebSearchResult, WebSearchSou
 
 /**
  * Mark a Config field live: harness >= 0.1.7 resolves `volatile()` fields as
- * refs that track the settings service, which is what makes the Web UI card's
- * edits apply without a reload. Tolerates a schemastery that predates the
+ * refs that track the settings service, which is what makes the plugin
+ * configuration form's edits apply without a reload. Tolerates a schemastery that predates the
  * marker (the monorepo's devDep 3.18.1, versus the harness' own 3.18.4) so the
  * module still loads there; the field is then a plain value, as before 0.1.7.
  * TODO: drop the local type shim once the monorepo devDeps reach the 0.1.7 range.
@@ -98,32 +98,61 @@ const ConfigSchema = Schema.object({
   enableFetchProvider: Schema.boolean().default(false),
 });
 
-type Config = ReturnType<typeof ConfigSchema>;
-
 /**
- * A loader config with every live field unwrapped. Harness >= 0.1.7 removed
- * `settings.installSection` (and the module-level settings helpers before it):
- * the loader entry's schema IS the settings section, and each `volatile()`
- * field arrives as a live ref (`get()`) that tracks the settings service.
+ * One live Config field on harness >= 0.1.7: the loader hands `volatile()`
+ * fields over as refs, and `get()` reads the value the settings form last
+ * saved. Structurally identical to the harness' own `Volatile<T>`
+ * (`@deepseek-ai/cordis` re-exports it from cosmokit); declared locally only
+ * because the monorepo's devDeps predate it.
+ * TODO: import it from `@deepseek-ai/cordis` once the devDeps reach 0.1.7.
  */
-type ConfigValues = {
-  [K in keyof Config]: Config[K] extends { get(): infer V } ? V : Config[K];
-};
-
-/** Unwrap one loader config field: a volatile ref yields its live value. */
-function unwrap(value: unknown): unknown {
-  return value !== null && typeof value === 'object'
-    && typeof (value as { get?: unknown }).get === 'function'
-    ? (value as { get(): unknown }).get()
-    : value;
+interface Volatile<T> {
+  get(): T;
 }
 
-/** Unwrap a whole loader config object handed to `apply`. */
-function unwrapConfig(config: Config): ConfigValues {
-  const source = config as unknown as Record<string, unknown>;
-  const out: Record<string, unknown> = {};
-  for (const key of Object.keys(source)) out[key] = unwrap(source[key]);
-  return out as unknown as ConfigValues;
+/**
+ * The plugin's Config, as the harness hands it to `apply`: every editable field
+ * is a live ref, the one structural field stays a plain value. Mirrors the
+ * official web-search provider (`packages/web/web-search-deepseek`) and the
+ * config cookbook (`docs/cookbook/adding-a-settings-card.md`).
+ */
+export interface Config {
+  apiKey: Volatile<string | undefined>;
+  apiKeyEnv: Volatile<string>;
+  baseURL: Volatile<string>;
+  searchPath: Volatile<string>;
+  fetchPath: Volatile<string>;
+  apiVersion: Volatile<string>;
+  snippetMax: Volatile<number>;
+  searchTimeoutMs: Volatile<number>;
+  fetchTimeoutMs: Volatile<number>;
+  /** Structural: decides at apply time whether the fetch provider registers. */
+  enableFetchProvider: boolean;
+}
+
+/** One operation's plain values: `Config` with every live ref read once. */
+type ConfigValues = {
+  [K in keyof Config]: Config[K] extends Volatile<infer V> ? V : Config[K];
+};
+
+/**
+ * Read every live field once, at the start of one operation, so a single
+ * search or fetch never mixes two settings sections — the official contract is
+ * exactly this ("read `.get()` when starting an operation").
+ */
+function snapshot(config: Config): ConfigValues {
+  return {
+    apiKey: config.apiKey.get(),
+    apiKeyEnv: config.apiKeyEnv.get(),
+    baseURL: config.baseURL.get(),
+    searchPath: config.searchPath.get(),
+    fetchPath: config.fetchPath.get(),
+    apiVersion: config.apiVersion.get(),
+    snippetMax: config.snippetMax.get(),
+    searchTimeoutMs: config.searchTimeoutMs.get(),
+    fetchTimeoutMs: config.fetchTimeoutMs.get(),
+    enableFetchProvider: config.enableFetchProvider,
+  };
 }
 
 interface ResolveOptions {
@@ -441,23 +470,25 @@ class OllamaFetchProvider implements WebFetchProvider {
 //#endregion
 
 function apply(ctx: Context, config: Config) {
-  // Harness >= 0.1.7 dropped `settings.installSection`; the entry schema is the
-  // settings section and the volatile fields above are the live source, so
-  // every operation resolves through `unwrapConfig` to pick up saved edits.
-  ctx.web.registerSearchProvider(new OllamaSearchProvider(() => resolveOptions(ctx, unwrapConfig(config))));
+  // Harness >= 0.1.7: the entry's Config schema IS the settings section and its
+  // volatile fields are the live values, so every operation snapshots them and
+  // sees whatever the form last saved — no section-install call, no cached copy.
+  ctx.web.registerSearchProvider(new OllamaSearchProvider(() => resolveOptions(ctx, snapshot(config))));
   // Off by default (see `enableFetchProvider`): the built-in generic `http`
   // fetch provider is the documented choice, and a second usable fetch
   // provider makes the seam refuse auto-selection unless `fetchProvider` is
   // pinned explicitly. Registration is structural, so this reads the loader
   // config, not the hot-reloadable settings source.
-  if (unwrapConfig(config).enableFetchProvider === true) {
-    ctx.web.registerFetchProvider(new OllamaFetchProvider(() => resolveOptions(ctx, unwrapConfig(config))));
+  if (config.enableFetchProvider === true) {
+    ctx.web.registerFetchProvider(new OllamaFetchProvider(() => resolveOptions(ctx, snapshot(config))));
   }
 }
 
+// Official plugin shape (`docs/cookbook/adding-a-settings-card.md`, and every
+// in-tree plugin): named exports of `name`, `inject`, the Config schema and
+// `apply`. The loader's `unwrapExports` only collapses a module to its
+// `default` when one exists, so a named-only module keeps the whole namespace
+// visible to the harness — including the Config schema the settings form is
+// projected from.
 export { ConfigSchema as Config };
-// `Config` MUST ride the default export: the loader's `unwrapExports` reduces a
-// module namespace to its `default`, so a named-only `Config` is invisible to
-// the harness. Without it the entry has no schema at all — no live volatile
-// refs and no `web-search-ollama` settings namespace for the UI card.
-export default { name, inject, Config: ConfigSchema, apply };
+export { name, inject, apply };
