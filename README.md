@@ -1,6 +1,6 @@
 # dsh-web-search-ollama
 
-Ollama 云端搜索 / 抓取插件，用于 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DSH）的 `ctx.web` seam：把模型的联网搜索能力从官方 DeepSeek 搜索切换到 **Ollama 云端 API**（`/api/web_search` + `/api/web_fetch`），并在 **Web GUI 的「插件设置 → 插件配置」页**提供配置表单（harness 依据宿主半的 schema 自动生成；保存即时生效、无需重启）。
+Ollama 云端搜索 / 抓取插件，用于 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DSH）的 `ctx.web` seam：把模型的联网搜索能力从官方 DeepSeek 搜索切换到 **Ollama 云端 API**（`/api/web_search` + `/api/web_fetch`），并在 **Web 侧边栏的 Plugins 页**提供配置表单（harness 依据宿主半的 schema 自动生成；保存即时生效、无需重启）。注意：`设置 → 插件设置` 从 **0.1.7 起是只读的插件清单**，可编辑的配置已迁到侧边栏 Plugins 页。
 
 ## 特性
 
@@ -120,7 +120,7 @@ cp packages/dsh-web-search-ollama/index.js       packages/dsh-web-search-ollama/
 ### 3. 配置密钥（二选一）
 
 - **环境变量**（推荐）：设置 `OLLAMA_API_KEY`，patch 的 `config.apiKeyEnv` 默认指向它；
-- **UI 填写**：设置 → 插件设置 → 插件配置 → **web-search-ollama** → 填 `baseURL` 等字段（`apiKey` 建议留空，交给 `apiKeyEnv`）→ 保存。
+- **UI 填写**（harness ≥ 0.1.7）：侧边栏 **Plugins** → 组合包 **`dsh-web-search-ollama`** → 行 **`web-search-ollama`** → **配置** → 填 `baseURL` 等字段（`apiKey` 建议留空，交给 `apiKeyEnv`）→ 保存。
 
 ### 4. 启动 / 生效
 
@@ -151,7 +151,7 @@ curl -s -X POST http://127.0.0.1:3080/api/settings.describe \
 # 期望: namespaces 中包含 "web-search-ollama"
 ```
 
-**配置表单**：设置 → 插件设置 → 插件配置 → 展开 **web-search-ollama**，编辑字段后保存（写入 profile 的 patch 文档，即时生效）。
+**配置表单**（harness ≥ 0.1.7）：侧边栏 **Plugins** → `dsh-web-search-ollama` 组合包下的行 `web-search-ollama` → **配置**，编辑字段后保存（写入 profile 的 patch 文档，即时生效）。旧路径 `设置 → 插件设置 → 插件配置` 只在 0.1.6 及更早存在；0.1.7 起该页是只读清单。
 
 ## 配置项
 
@@ -229,7 +229,7 @@ pnpm test             # 模块形状测试 + provider 行为测试（test.mjs + 
 
 | 现象 | 原因与处理 |
 |---|---|
-| 搜索不生效，插件配置页没有该条目 | 宿主包未装入 profile node_modules；`pluginInventory/list` 看不到条目 → 重跑 `./scripts/install.sh` |
+| 搜索不生效，Plugins 页里没有该组合包/行 | 宿主包未装入 profile node_modules；`pluginInventory/list` 看不到条目 → 重跑 `./scripts/install.sh` |
 | 配置页看不到 `web-search-ollama` 表单 | `settings/describe` 里没有该命名空间 → 宿主包未 apply，或它的 `Config` schema 对 harness 不可见（v0.1.6 起 `Config` 同时挂在 default 导出上；查 `pluginInventory/list` 中 `web-search-ollama` 是否 active） |
 | UI 启动提示 `web boot: 1 entry did not activate`（`dsh-web-search-ollama-client … waiting for service: settingsScope`） | harness 0.1.7 已移除客户端 `settingsScope` 服务；删掉 profile patch 里 `web-search-ollama-client` 的 `insert` 条目（v0.1.7 的 `install.sh` 不再添加）后重启 |
 | 以 `link:`/本地目录安装后**配置表单消失**、但搜索仍然可用 | 包自己解析到了没有 `volatile()` 的 schemastery（< 3.18.4），于是字段不再是 live ref，`volatileForm(schema)` 为空 → 该条目不进 `settings/describe`。v0.1.9 起 `dependencies` 已收敛为 `~3.18.4`；若手改过依赖，删掉包内 `node_modules/@deepseek-ai/schemastery` 重装即可 |

@@ -15,7 +15,9 @@
 #
 # No network access is required — the packages are copied verbatim from this
 # repo. After installing, (re)start `dsh web` and open
-# 设置 → 插件设置 → 插件配置 → Ollama 网页搜索  to configure.
+# Web sidebar -> Plugins -> bundle dsh-web-search-ollama -> row web-search-ollama
+#   -> Configure   to configure (harness >= 0.1.7; the Settings plugin list is
+#   read-only and holds no editable forms).
 # =============================================================================
 set -euo pipefail
 
@@ -147,7 +149,7 @@ fi
 
 echo
 echo "==> Done. Restart dsh web (or hot-reload the patch), then configure:"
-echo "    设置 → 插件设置 → 插件配置 → web-search-ollama（内置插件管理器按 schema 生成的表单）"
+echo "    侧边栏 Plugins → 组合包 dsh-web-search-ollama → 行 web-search-ollama → 配置"
 echo
 echo "    Verify the loader picked both halves up:"
 echo "    curl -s -X POST http://127.0.0.1:3080/api/pluginInventory/list \\"

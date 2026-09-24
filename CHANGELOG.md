@@ -2,6 +2,14 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [0.1.10] - 2026-09-25
+
+文档修正：**0.1.7 起可编辑的插件配置已不在 `设置 → 插件设置` 里**（该页现在是只读的插件清单，文案为「插件视图 / 内置插件 / 查看内置部署的插件列表」），配置表单迁到 **Web 侧边栏的 Plugins 页** —— 组合包 → 行 → 「配置」。
+
+### Fixed
+
+- README 与 `scripts/install.sh` 里的旧路径指引（`设置 → 插件设置 → 插件配置`）全部更新为新入口；补一条排查项：在设置页找不到表单属**预期**，去侧边栏 Plugins 页找。
+
 ## [0.1.9] - 2026-09-24
 
 宿主半改成 **bundle**（可被 `dsh plugin` / Web 的 Plugins 页直接安装与管理），并清掉 0.1.8 审核时「有意保留」的两个本地 type shim —— 源码现在是**逐字官方写法**。这一步由一次真机实测驱动：把包以链接方式装进临时 profile 后，**配置表单静默消失**，根因是包自己解析到旧的 schemastery 3.18.1（没有 `volatile()`）。
@@ -178,6 +186,7 @@ v0.1.6 的后续补丁：**停用浏览器半**。宿主半在 0.1.7 下已正�
 - 默认联网搜索从内置 DeepSeek 搜索切换到 Ollama 云端（需配置 `OLLAMA_API_KEY`；内置 `web-search-deepseek` 默认停用）。
 - host 插件由本地文件加载改为正式 npm 包 `dsh-web-search-ollama`（peerDependencies：`dsh-settings`、`dsh-web`；dependencies：`schemastery`）。
 
+[0.1.10]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.10
 [0.1.9]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.9
 [0.1.8]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.8
 [0.1.7]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.7
