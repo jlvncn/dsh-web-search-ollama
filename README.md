@@ -242,7 +242,7 @@ pnpm test             # 模块形状测试 + provider 行为测试（test.mjs + 
 | Plugins 页里组合包 `dsh-web-search-ollama` 的行**没有「配置」箭头** | 说明没有任何客户端插件注册 `plugins.row.config` 的 `dsh-web-search-ollama#web-search-ollama` 键 —— 浏览器半没装或没挂载：`dsh plugin --profile web add <client 包路径>`，然后刷新页面（必要时重启 dsh web） |
 | 以 `link:`/本地目录安装后**配置表单消失**、但搜索仍然可用 | 包自己解析到了没有 `volatile()` 的 schemastery（< 3.18.4），于是字段不再是 live ref，`volatileForm(schema)` 为空 → 该条目不进 `settings/describe`。v0.1.9 起 `dependencies` 已收敛为 `~3.18.4`；若手改过依赖，删掉包内 `node_modules/@deepseek-ai/schemastery` 重装即可 |
 | 插件行被组合期拒绝，报 `incompatible-version`（或该行被置为 `disabled`） | `peerDependencies` 里声明的 dsh 范围与运行期 `dsh --version` 不匹配（校验规则见 app-boot README §profiles）。换用与核心匹配的插件版本；确需放行要走 `dsh plugin --profile web allow-version <包@版本> --dsh-version <运行期版本> --accept-risk`（有风险，官方要求显式确认） |
-| 插件列表出现两个 ollama 条目 | 旧安装残留：profile patch 里还挂着 `web-search-ollama-client` → 删掉该条目；v0.1.7 起只有一个宿主条目 |
+| 插件列表出现两个 ollama 条目（host + client） | **v0.1.11 起属正常且必需**：host 提供搜索/抓取能力，client 提供 Plugins 页上那一行的「配置」入口。若把 client 停用或卸载，行上的「配置」箭头会消失（配置只能改 profile patch 了） |
 | **旧会话打不开，报 `web/deepseek-search-llm-request … body has unexpected member "query"`** | v0.1.5 之前插件把 Ollama 请求写成官方事件，导致含该事件的 **v0 格式**会话无法通过 v0→v1 迁移。升级到 v0.1.5（不再写任何会话事件）即可止住新增；**已在磁盘上的历史 v0 会话需要单独做一次性 v0→v3 迁移**，升级插件本身不会修复它们。 |
 | **macOS 上用云端 `https://ollama.com` 搜索超时 / `UND_ERR_CONNECT_TIMEOUT`，但 `nslookup` 正常** | 本机 `getaddrinfo` 对该域名的缓存异常（某些网络环境会恰好卡 ~30s）。执行 `sudo dscacheutil -flushcache && sudo killall -HUP mDNSResponder` 即可（仅清空本地 DNS 缓存，安全可逆，无需改 `/etc/hosts`）。若反复出现，建议改用自建 Ollama（`baseURL` 填 `http://localhost:11434`） |
 

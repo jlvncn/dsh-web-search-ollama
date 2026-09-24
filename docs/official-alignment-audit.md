@@ -50,3 +50,4 @@
 | peer 校验 | 组合期校验（app-boot）随启动进行 | 未被拒绝（范围 `>=0.1.7-rc.1 <0.2.0` 匹配运行期） |
 | **bundle 安装（v0.1.9）** | 临时 profile：`dsh plugin --profile scratch add <本地目录>` | bundle 自动选中；行 active；`settings/describe` 含 8 字段；无诊断文件 |
 | **shim 删除后回归（v0.1.9）** | 同上（包以 `link:` 安装，解析 schemastery 3.18.4） | 表单命名空间回归（修掉了「链接安装下表单静默消失」） |
+| **配置入口回归（v0.1.11）** | 用户在浏览器里打开 Plugins 页 | 组合包 `dsh-web-search-ollama` → 行 `web-search-ollama` 出现「配置」入口且可改配置（0.1.7 契约下 `plugins.row.config` 注册生效） |
