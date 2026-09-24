@@ -2,12 +2,13 @@
 # =============================================================================
 # dsh-web-search-ollama — install into a DeepSeek Harness profile
 #
-# Copies the host plugin package into the profile's hoisted node_modules and
-# merges the loader patch into cordis.patch.yml.
+# Copies both plugin packages (host + browser half) into the profile's hoisted
+# node_modules and merges the loader patch into cordis.patch.yml.
 #
-# The browser half (dsh-web-search-ollama-client) is no longer installed: its
-# client-side `settingsScope` service was removed in harness 0.1.7, and the
-# built-in plugin manager now renders the entry's Config schema itself.
+# The browser half is what puts the configure control on the host plugin's row
+# on the Plugins page: harness >= 0.1.7 shows that control only when a client
+# plugin registers the keyed slot `plugins.row.config` under the key
+# `dsh-web-search-ollama#web-search-ollama`.
 #
 # Usage:
 #   ./scripts/install.sh            # install into the default "web" profile
@@ -38,11 +39,15 @@ echo "==> host package   -> $NM_DIR/dsh-web-search-ollama"
 mkdir -p "$NM_DIR/dsh-web-search-ollama"
 cp "$HOST_PKG/index.js"       "$NM_DIR/dsh-web-search-ollama/index.js"
 cp "$HOST_PKG/package.json"   "$NM_DIR/dsh-web-search-ollama/package.json"
+cp "$HOST_PKG/cordis.patch.yml" "$NM_DIR/dsh-web-search-ollama/cordis.patch.yml"
 
-# --- 2. browser half: retired (harness >= 0.1.7) -----------------------------
-# An existing dsh-web-search-ollama-client/ copy under $NM_DIR is left alone but
-# is no longer mounted. Remove its `insert` entry from cordis.patch.yml if a
-# previous install added one.
+# --- 2. browser half (the Plugins page configure control) -------------------
+echo "==> client package -> $NM_DIR/dsh-web-search-ollama-client"
+mkdir -p "$NM_DIR/dsh-web-search-ollama-client"
+cp "$CLIENT_PKG/index.js"       "$NM_DIR/dsh-web-search-ollama-client/index.js"
+cp "$CLIENT_PKG/client.js"      "$NM_DIR/dsh-web-search-ollama-client/client.js"
+cp "$CLIENT_PKG/package.json"   "$NM_DIR/dsh-web-search-ollama-client/package.json"
+cp "$CLIENT_PKG/cordis.patch.yml" "$NM_DIR/dsh-web-search-ollama-client/cordis.patch.yml"
 
 # --- 3. loader patch (cordis.patch.yml) --------------------------------------
 echo "==> loader patch    -> $PROFILE_DIR/cordis.patch.yml"

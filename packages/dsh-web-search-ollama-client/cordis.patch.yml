@@ -1,0 +1,15 @@
+# =============================================================================
+# dsh-web-search-ollama-client — bundle patch
+#
+# Shipped as this package's `dsh.bundle.patch` (see package.json), so installing
+# the package as a profile bundle mounts the browser half's loader row.
+#
+# What the half does: it registers the keyed slot `plugins.row.config` under the
+# key `dsh-web-search-ollama#web-search-ollama`, which is what puts the configure
+# control on the host plugin's row on the Web UI's Plugins page (harness >= 0.1.7
+# contract). Mounted as a package name so the client module scanner finds the
+# package's `dsh.client` declaration and serves its `./client` bundle.
+# =============================================================================
+- insert:
+    - id: web-search-ollama-client
+      name: dsh-web-search-ollama-client

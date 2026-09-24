@@ -1,17 +1,19 @@
 {
   "name": "dsh-web-search-ollama-client",
-  "version": "0.1.10",
-  "description": "Browser half for dsh-web-search-ollama: registers the plugin configuration card in the DeepSeek Harness Web UI settings page",
+  "version": "0.1.11",
+  "description": "Browser half for dsh-web-search-ollama: registers the plugin row's configuration card on the DeepSeek Harness Web UI Plugins page",
   "type": "module",
   "main": "index.js",
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },
   "files": [
     "index.js",
-    "client.js"
+    "client.js",
+    "cordis.patch.yml"
   ],
   "license": "MIT",
   "publishConfig": {
@@ -33,8 +35,15 @@
     "ollama"
   ],
   "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
     "client": {
-      "platform": "web"
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-plugin-manager",
+        "@deepseek-ai/dsh-client-ui-primitives"
+      ]
     }
   }
 }

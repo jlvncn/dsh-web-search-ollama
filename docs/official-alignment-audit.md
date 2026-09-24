@@ -27,7 +27,7 @@
 | 8 | `WebError` 的 seam 中性码为 `WEB_PROVIDER_ERROR`/`WEB_ABORTED` 等；provider 允许自带码，consumer 必须容忍未知码（web 子系统 §Errors） | 用 `WEB_PROVIDER_ERROR`/`WEB_ABORTED` + 自定义 `WEB_PROVIDER_CREDENTIAL_MISSING` | ✅ 原本符合（自定义码被明确允许） |
 | 9 | provider 注册返回 disposer，随调用 fiber 释放（web 子系统 §ctx.web） | 直接注册，不保存 disposer | ✅ 原本符合 |
 | 10 | 库包不声明 `dsh.bundle`（bundle 才声明，plugin-manager） | 无 `dsh` 字段 | ✅ 原本符合 |
-| 11 | 浏览器半：客户端 `dsh.client` + `./client` lazy-CJS bundle + `plugins.item` slot + `dsh.client.inject`（cookbook §5） | 停用（依赖的 `settingsScope` 在 0.1.7 被 `configForms` 取代） | 现状保留；重写要点见 `dsh-upgrade-0.1.7-impact.md` §1.3 |
+| 11 | 浏览器半：客户端 `dsh.client` + `./client` lazy-CJS bundle + 键值插槽 `plugins.row.config`（key = `组合包名#行id`）+ `dsh.client.inject`（cookbook §5、slot contract） | v0.1.7–v0.1.10 停用 → **UI 无配置入口**（0.1.7 无自动兜底页，`autoGenerate` 前端未消费） | **v0.1.11 已按契约重写并挂载**：注册 `plugins.row.config` 键 `dsh-web-search-ollama#web-search-ollama`，表单用 primitives，写入 `form.mutate` |
 
 ## 3. 有意保留的偏差
 

@@ -1,11 +1,18 @@
 /**
  * dsh-web-search-ollama-client — browser half.
  *
- * A "web-search-ollama" card inside the Web UI's plugin-configuration tab
- * (设置 → 插件设置 → 插件配置): edits the `web-search-ollama` settings
- * namespace (baseURL, search/fetch paths, snippet cap, timeouts, key ref)
- * through the settings scope transport. Changes hot-apply via the host
- * settings provider — no restart needed.
+ * Registers the "row configuration" page of the plugin's own loader row on the
+ * Web UI's Plugins page: bundle `dsh-web-search-ollama` → row
+ * `web-search-ollama` → the configure control opens this card.
+ *
+ * Harness >= 0.1.7 contract (see the slot contract shipped by
+ * `@deepseek-ai/dsh-client-ui-plugin-manager`): a row gains its configure
+ * control only when a client plugin registers the keyed slot
+ * `plugins.row.config` under the key `<bundle package name>#<row id>`, and the
+ * page passes `{ view, form }` to that registration. `form` carries the
+ * namespace's live snapshot plus `mutate(ops, revision)`; the page resolves it
+ * with the row id (`web-search-ollama`), which is exactly this plugin's
+ * settings namespace.
  *
  * Hand-written ModuleLoader bundle — no build step required.
  */
@@ -16,311 +23,277 @@ window.__ModuleLoader__.load({
     var exports = module.exports;
     Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
     var react = require("react");
-    var h = react.createElement;
+    var primitives = require("@deepseek-ai/dsh-client-ui-primitives");
 
-    // ── CSS (theme tokens) ────────────────────────────────────────────────
-    // Card chrome mirrors the official PluginCard.module.css so this card looks
-    // and behaves like the built-in ones: a clickable header that discloses the
-    // body in place, with a CSS-drawn chevron (no icon dependency).
-    var CSS =
-      ".__wso_card{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);border-radius:12px;list-style:none;transition:border-color .16s,background .16s}" +
-      ".__wso_card:hover{border-color:var(--dsw-alias-label-dimmed)}" +
-      ".__wso_card_open{background:var(--dsw-alias-bg-layer-2);border-color:var(--dsw-alias-label-dimmed)}" +
-      ".__wso_header{appearance:none;width:100%;font:inherit;color:inherit;text-align:left;cursor:pointer;background:0 0;border:0;border-radius:12px;align-items:center;gap:12px;padding:14px 16px;display:flex}" +
-      ".__wso_header:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-2px}" +
-      ".__wso_header_text{flex-direction:column;flex:1;gap:4px;min-width:0;display:flex}" +
-      ".__wso_name{color:var(--dsw-alias-label-primary);font-size:15px;font-weight:600;line-height:1.4}" +
-      ".__wso_description{color:var(--dsw-alias-label-tertiary);font-size:13px;line-height:1.5}" +
-      ".__wso_chevron{display:inline-block;width:8px;height:8px;flex:none;border-right:1.5px solid var(--dsw-alias-label-tertiary);border-bottom:1.5px solid var(--dsw-alias-label-tertiary);transform:rotate(45deg);transition:transform .16s}" +
-      ".__wso_chevron_open{transform:rotate(225deg)}" +
-      ".__wso_body{border-top:1px solid var(--dsw-alias-border-l2);margin:0 16px;padding-bottom:8px}" +
-      ".__wso_field{flex-direction:column;gap:6px;padding:12px 0;display:flex}" +
-      ".__wso_field+.__wso_field{border-top:1px solid var(--dsw-alias-border-l2)}" +
-      ".__wso_label{min-width:0;color:var(--dsw-alias-label-primary);flex:1;font-size:13px;font-weight:500;line-height:1.5;display:flex;align-items:center;gap:6px}" +
-      ".__wso_override{font-size:10px;color:var(--dsw-alias-state-business-primary);border:1px solid var(--dsw-alias-border-l2);border-radius:4px;padding:0 4px}" +
-      ".__wso_hint{color:var(--dsw-alias-label-tertiary);margin:0;font-size:12px;line-height:1.5}" +
-      ".__wso_input{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);height:34px;font:inherit;color:var(--dsw-alias-label-primary);border-radius:8px;padding:0 12px;font-size:13px;line-height:1.5;box-sizing:border-box;width:100%}" +
-      ".__wso_input:focus-visible{border-color:var(--dsw-alias-brand-primary);outline:none}" +
-      ".__wso_actions{border-top:1px solid var(--dsw-alias-border-l2);justify-content:flex-end;align-items:center;gap:8px;padding:12px 0 4px;display:flex}" +
-      ".__wso_btn{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);color:var(--dsw-alias-label-primary);border-radius:8px;padding:5px 14px;font:inherit;font-size:13px;line-height:1.5;cursor:pointer}" +
-      ".__wso_btn:hover:not(:disabled){border-color:var(--dsw-alias-state-business-primary)}" +
-      ".__wso_btn:disabled{opacity:.5;cursor:default}" +
-      ".__wso_btnPrimary{border-color:var(--dsw-alias-state-business-primary,#3964fe);background:var(--dsw-alias-state-business-primary,#3964fe);color:#fff}" +
-      ".__wso_status{font-size:12px;color:var(--dsw-alias-label-tertiary)}" +
-      ".__wso_error{font-size:12px;color:var(--dsw-alias-state-error-primary)}" +
-      ".__wso_unavailable{font-size:13px;color:var(--dsw-alias-label-tertiary);padding:14px 16px}";
-    var tagId = "dsh-web-search-ollama-client/main.css";
-    if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId) + "]") === null) {
-      var tag = document.createElement("style");
-      tag.dataset.plugin = "dsh-web-search-ollama-client";
-      tag.dataset.pluginCss = tagId;
-      tag.textContent = CSS;
-      document.head.appendChild(tag);
-    }
+    /** Locale namespace owned by this card. */
+    var NS = "settings.webSearchOllama";
+    /** Settings namespace (the loader entry id) this card edits. */
+    var TARGET_NS = "web-search-ollama";
+    /** Slot key: `<bundle package name>#<row id>`, as the bundle's patch declares them. */
+    var ROW_KEY = "dsh-web-search-ollama#web-search-ollama";
 
-    // ── locale ────────────────────────────────────────────────────────────
-    var NS = "webSearchOllama";
-    var inject = ["slots", "locale", "settingsScope"];
     var zh = {
       title: "Ollama 网页搜索",
       description: "Ollama 云端搜索 / 抓取提供方。",
-      intro: "Ollama 云端搜索配置：修改后即时生效（settings.yaml 热重载）。",
-      apiKey: "API Key",
-      apiKeyHint: "留空保持当前密钥。密钥只写不读，不会回显。",
-      apiKeyEnv: "密钥环境变量",
-      apiKeyEnvHint: "apiKey 为空时从该环境变量读取（credentials 解析）。",
       baseURL: "API 地址",
-      baseURLHint: "Ollama API 根地址。",
+      baseURLHint: "Ollama API 根地址；搜索/抓取路径拼在其后。",
       searchPath: "搜索路径",
-      searchPathHint: "POST 搜索端点路径。",
+      searchPathHint: "POST 搜索端点路径，默认 /api/web_search。",
       fetchPath: "抓取路径",
-      fetchPathHint: "POST 抓取端点路径。",
+      fetchPathHint: "POST 抓取端点路径，默认 /api/web_fetch。",
+      apiKeyEnv: "密钥环境变量",
+      apiKeyEnvHint: "apiKey 为空时从这里解析（credentials 优先，其次启动环境）。",
       snippetMax: "摘要上限（字符）",
-      snippetMaxHint: "每条搜索结果的 content 截断长度。",
+      snippetMaxHint: "每条搜索结果 content 的截断长度。",
       searchTimeoutMs: "搜索超时（毫秒）",
-      searchTimeoutMsHint: "搜索请求的 abort 超时。",
+      searchTimeoutMsHint: "一次搜索的取消上限。",
       fetchTimeoutMs: "抓取超时（毫秒）",
-      fetchTimeoutMsHint: "抓取请求的 abort 超时。",
-      save: "保存",
-      reset: "恢复默认",
-      saved: "已保存",
-      saving: "保存中…",
-      error: "保存失败",
-      unavailable: "设置命名空间不可用（服务端未注册 web-search-ollama 命名空间？）",
-      overridden: "已覆盖",
-      loading: "加载中…",
-      collapse: "折叠",
-      expand: "展开"
-    };
-    var en = {
-      title: "Ollama Web Search",
-      description: "Ollama cloud search / fetch provider.",
-      intro: "Ollama cloud search config: changes apply immediately (settings.yaml hot-reload).",
+      fetchTimeoutMsHint: "一次抓取的取消上限。",
+      apiVersion: "apiVersion（已弃用）",
+      apiVersionHint: "保留字段，插件已不再使用。",
       apiKey: "API Key",
-      apiKeyHint: "Leave blank to keep the current key. The key is write-only and never echoed.",
-      apiKeyEnv: "Key environment variable",
-      apiKeyEnvHint: "Read from this env var when apiKey is empty (resolved via credentials).",
-      baseURL: "API base URL",
-      baseURLHint: "Ollama API root.",
+      apiKeyHint: "只写不读：留空保持当前密钥；也可留空并改用上面的环境变量。",
+      overridden: "已覆盖",
+      reset: "恢复默认",
+      invalidNumber: "请填数字；留空表示恢复默认。",
+      unavailable: "该插件当前未加载，暂时无法配置。",
+      readOnly: "本部署的设置为只读。",
+      saveFailed: "本部署没有接受这些值，已保留供你修改。",
+      save: "保存",
+      saving: "保存中…"
+    };
+
+    var en = {
+      title: "Ollama web search",
+      description: "Ollama-backed search and fetch provider.",
+      baseURL: "Endpoint",
+      baseURLHint: "Ollama API root; the search and fetch paths are appended to it.",
       searchPath: "Search path",
-      searchPathHint: "POST search endpoint path.",
+      searchPathHint: "POST search endpoint path, default /api/web_search.",
       fetchPath: "Fetch path",
-      fetchPathHint: "POST fetch endpoint path.",
-      snippetMax: "Snippet cap (chars)",
-      snippetMaxHint: "Truncated content length per search result.",
+      fetchPathHint: "POST fetch endpoint path, default /api/web_fetch.",
+      apiKeyEnv: "Key variable",
+      apiKeyEnvHint: "Resolved here when apiKey is empty (credentials first, then the launch environment).",
+      snippetMax: "Snippet cap (characters)",
+      snippetMaxHint: "Truncation length for each search result's content.",
       searchTimeoutMs: "Search timeout (ms)",
-      searchTimeoutMsHint: "Abort timeout for search requests.",
+      searchTimeoutMsHint: "Cancellation bound for one search.",
       fetchTimeoutMs: "Fetch timeout (ms)",
-      fetchTimeoutMsHint: "Abort timeout for fetch requests.",
+      fetchTimeoutMsHint: "Cancellation bound for one fetch.",
+      apiVersion: "apiVersion (unused)",
+      apiVersionHint: "Retained field; the plugin no longer reads it.",
+      apiKey: "API key",
+      apiKeyHint: "Write-only: leave blank to keep the current key, or use the variable above instead.",
+      overridden: "Overridden",
+      reset: "Reset to default",
+      invalidNumber: "Enter a number, or leave blank to use the default.",
+      unavailable: "This plugin is not loaded, so it cannot be configured right now.",
+      readOnly: "This deployment stores settings read-only.",
+      saveFailed: "The deployment did not accept these values; they were left for you to correct.",
       save: "Save",
-      reset: "Reset",
-      saved: "Saved",
-      saving: "Saving…",
-      error: "Save failed",
-      unavailable: "Settings namespace unavailable (web-search-ollama namespace not registered server-side?)",
-      overridden: "overridden",
-      loading: "Loading…",
-      collapse: "Collapse",
-      expand: "Expand"
+      saving: "Saving…"
     };
 
-    // ── field spec ────────────────────────────────────────────────────────
+    /**
+     * The section fields this card edits, in display order. `kind` decides how a
+     * draft is parsed: `number` blocks the save until it is a finite number (an
+     * empty draft clears the field back to the schema default).
+     */
     var FIELDS = [
-      { key: "baseURL", label: "baseURL", type: "text", placeholder: "https://ollama.com" },
-      { key: "apiKey", label: "apiKey", type: "password", secret: true },
-      { key: "apiKeyEnv", label: "apiKeyEnv", type: "text" },
-      { key: "searchPath", label: "searchPath", type: "text", placeholder: "/api/web_search" },
-      { key: "fetchPath", label: "fetchPath", type: "text", placeholder: "/api/web_fetch" },
-      { key: "snippetMax", label: "snippetMax", type: "number" },
-      { key: "searchTimeoutMs", label: "searchTimeoutMs", type: "number" },
-      { key: "fetchTimeoutMs", label: "fetchTimeoutMs", type: "number" }
+      { name: "baseURL", kind: "text" },
+      { name: "searchPath", kind: "text" },
+      { name: "fetchPath", kind: "text" },
+      { name: "apiKeyEnv", kind: "text" },
+      { name: "snippetMax", kind: "number" },
+      { name: "searchTimeoutMs", kind: "number" },
+      { name: "fetchTimeoutMs", kind: "number" },
+      { name: "apiVersion", kind: "text" }
     ];
-    var ZH_HINTS = {
-      apiKey: "apiKeyHint",
-      apiKeyEnv: "apiKeyEnvHint",
-      baseURL: "baseURLHint",
-      searchPath: "searchPathHint",
-      fetchPath: "fetchPathHint",
-      snippetMax: "snippetMaxHint",
-      searchTimeoutMs: "searchTimeoutMsHint",
-      fetchTimeoutMs: "fetchTimeoutMsHint"
-    };
 
-    function labelOf(f, t) {
-      return t(f.key) !== f.key ? t(f.key) : f.label;
+    /** Render one value the way its field shows it when no draft is staged. */
+    function formatValue(value, kind) {
+      if (kind === "number") return typeof value === "number" ? String(value) : "";
+      return typeof value === "string" ? value : "";
     }
 
-    // ── component ─────────────────────────────────────────────────────────
-    function OllamaCard(props) {
-      var t = props.t;
-      var scope = props.scope;
-      var [open, setOpen] = react.useState(false);
-      var [snapshot, setSnapshot] = react.useState(function () { return scope.getSnapshot(); });
-      var ready = snapshot.status === "ready" && snapshot.value !== void 0;
-      var [draft, setDraft] = react.useState({});
-      var [busy, setBusy] = react.useState(false);
-      var [notice, setNotice] = react.useState(null);
-      var [error, setError] = react.useState(null);
-
-      react.useEffect(function () {
-        if (typeof scope.load === "function") {
-          scope.load();
-        }
-        var alive = true;
-        var sync = function () { if (alive) setSnapshot(scope.getSnapshot()); };
-        var un = typeof scope.subscribe === "function" ? scope.subscribe(sync) : null;
-        return function () { alive = false; if (un) un(); if (scope.dispose) scope.dispose(); };
-      }, [scope]);
-
-      react.useEffect(function () {
-        if (ready) setDraft(function (prev) { return Object.assign({}, prev, valueToDraft(snapshot.value)); });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-      }, [ready]);
-
-      if (snapshot.status === "unavailable") {
-        return h("li", { className: "__wso_unavailable" }, t("unavailable"));
+    /**
+     * Turn one staged draft into a settings path operation.
+     * @returns the op, or `undefined` when the draft cannot be written as it stands.
+     */
+    function parseDraft(text, kind, field) {
+      var trimmed = String(text == null ? "" : text).trim();
+      if (trimmed === "") return { op: "unset", path: [field] };
+      if (kind === "number") {
+        var parsed = Number(trimmed);
+        return Number.isFinite(parsed) ? { op: "set", path: [field], value: parsed } : undefined;
       }
-      if (!ready) return h("li", { className: "__wso_status" }, t("loading"));
-
-      var value = snapshot.value;
-      var user = snapshot.user || {};
-
-      function fieldDraft(f) {
-        return draft[f.key] !== void 0 ? draft[f.key] : String(value[f.key] ?? "");
-      }
-      function setField(f, v) {
-        setDraft(function (prev) {
-          var next = Object.assign({}, prev);
-          next[f.key] = v;
-          return next;
-        });
-        setNotice(null);
-        setError(null);
-      }
-
-      function onSave() {
-        setBusy(true); setNotice(null); setError(null);
-        var writes = FIELDS.map(function (f) {
-          var d = fieldDraft(f);
-          if (f.type === "password") {
-            if (!d) return Promise.resolve();
-            if (d === String(value[f.key] ?? "")) return Promise.resolve();
-            return scope.set(f.key, d);
-          }
-          if (String(d) === String(value[f.key] ?? "")) return Promise.resolve();
-          if (String(d).trim() === "" && !(f.key in user)) return Promise.resolve();
-          return String(d).trim() === "" ? scope.unset(f.key) : scope.set(f.key, f.type === "number" ? Number(d) : d);
-        });
-        Promise.all(writes).then(function () {
-          setBusy(false); setNotice(t("saved"));
-          if (typeof scope.load === "function") {
-            scope.load();
-          }
-        }).catch(function (e) {
-          setBusy(false); setError(t("error") + ": " + String(e && e.message || e));
-        });
-      }
-
-      function onReset() {
-        setBusy(true); setNotice(null); setError(null);
-        Promise.all(FIELDS.map(function (f) { return scope.unset(f.key); })).then(function () {
-          setBusy(false); setNotice(t("saved"));
-          reseedDraft();
-        }).catch(function (e) {
-          setBusy(false); setError(t("error") + ": " + String(e && e.message || e));
-        });
-      }
-
-      function reseedDraft() {
-        if (typeof scope.load === "function") {
-          var p = scope.load();
-          if (p && typeof p.then === "function") {
-            p.then(function () {
-              var fresh = scope.getSnapshot();
-              if (fresh.status === "ready" && fresh.value !== void 0) setDraft(Object.assign({}, valueToDraft(fresh.value)));
-            }).catch(function () {});
-            return;
-          }
-        }
-        setTimeout(function () {
-          var fresh = scope.getSnapshot();
-          if (fresh.status === "ready" && fresh.value !== void 0) setDraft(Object.assign({}, valueToDraft(fresh.value)));
-        }, 120);
-      }
-
-      return h("li", { className: open ? "__wso_card __wso_card_open" : "__wso_card" },
-        h("button", {
-          type: "button",
-          className: "__wso_header",
-          "aria-expanded": open,
-          "aria-label": (open ? t("collapse") : t("expand")) + ": " + t("title"),
-          onClick: function () { setOpen(!open); }
-        },
-          h("span", { className: "__wso_header_text" },
-            h("span", { className: "__wso_name" }, t("title")),
-            h("span", { className: "__wso_description" }, t("description"))
-          ),
-          h("span", { className: open ? "__wso_chevron __wso_chevron_open" : "__wso_chevron" })
-        ),
-        open ? h("div", { className: "__wso_body" },
-          h("p", { className: "__wso_hint", style: { margin: "0 0 4px" } }, t("intro")),
-          FIELDS.map(function (f) {
-            var overridden = f.key in user;
-            var hintKey = ZH_HINTS[f.key];
-            return h("label", { key: f.key, className: "__wso_field" },
-              h("span", { className: "__wso_label" },
-                labelOf(f, t),
-                overridden ? h("span", { className: "__wso_override" }, t("overridden")) : null
-              ),
-              h("input", {
-                className: "__wso_input",
-                type: f.type === "password" ? "password" : f.type === "number" ? "number" : "text",
-                value: fieldDraft(f),
-                placeholder: f.type === "password" ? (overridden ? "••••••••" : t("apiKeyHint")) : (f.placeholder || ""),
-                onChange: function (e) { setField(f, e.target.value); }
-              }),
-              hintKey && t(hintKey) ? h("span", { className: "__wso_hint" }, t(hintKey)) : null
-            );
-          }),
-          h("div", { className: "__wso_actions" },
-            h("button", { type: "button", className: "__wso_btn __wso_btnPrimary", onClick: onSave, disabled: busy || !snapshot.writable }, t("save")),
-            h("button", { type: "button", className: "__wso_btn", onClick: onReset, disabled: busy || !snapshot.writable }, t("reset")),
-            notice ? h("span", { className: "__wso_status" }, notice) : null,
-            busy ? h("span", { className: "__wso_status" }, t("saving")) : null,
-            error ? h("span", { className: "__wso_error" }, error) : null
-          )
-        ) : null
-      );
+      return { op: "set", path: [field], value: trimmed };
     }
 
-    function valueToDraft(value) {
-      var out = {};
-      for (var i = 0; i < FIELDS.length; i += 1) {
-        var f = FIELDS[i];
-        out[f.key] = String(value[f.key] ?? "");
-      }
-      return out;
+    /**
+     * Build the card bound to one translator.
+     *
+     * The card stages edits locally and writes them only on save: each write is a
+     * durable revision-fenced mutation, so committing as the user types would
+     * turn one edit into writes nobody asked for.
+     */
+    function makeCard(t) {
+      return function OllamaRowConfig(props) {
+        var stagedState = react.useState({});
+        var staged = stagedState[0];
+        var setStaged = stagedState[1];
+        var savingState = react.useState(false);
+        var saving = savingState[0];
+        var setSaving = savingState[1];
+        var failedState = react.useState(false);
+        var failed = failedState[0];
+        var setFailed = failedState[1];
+
+        if (props.view === "summary") return t("description");
+
+        var form = props.form;
+        var snapshot = form === undefined ? undefined : form.state;
+        var ready = snapshot !== undefined && snapshot.status === "ready";
+        var writable = ready && snapshot.writable !== false;
+        var value = (ready && snapshot.value) || {};
+
+        var textOf = function (field) {
+          return staged[field.name] !== undefined ? staged[field.name] : formatValue(value[field.name], field.kind);
+        };
+        var changed = FIELDS.filter(function (field) {
+          return staged[field.name] !== undefined && staged[field.name] !== formatValue(value[field.name], field.kind);
+        });
+        var invalidFields = changed.filter(function (field) {
+          return parseDraft(textOf(field), field.kind, field.name) === undefined;
+        });
+        var keyDraft = staged.apiKey;
+        var dirty = changed.length > 0 || (keyDraft !== undefined && keyDraft !== "");
+        var labels = {
+          unavailable: t("unavailable"),
+          readOnly: t("readOnly"),
+          saveFailed: t("saveFailed"),
+          save: t("save"),
+          saving: t("saving")
+        };
+
+        var onSave = function () {
+          if (!form || !writable || saving || invalidFields.length > 0) return;
+          var ops = [];
+          changed.forEach(function (field) {
+            var op = parseDraft(textOf(field), field.kind, field.name);
+            if (op !== undefined) ops.push(op);
+          });
+          if (keyDraft !== undefined && keyDraft !== "") {
+            ops.push({ op: "set", path: ["apiKey"], value: String(keyDraft) });
+          }
+          if (ops.length === 0) return;
+          setSaving(true);
+          setFailed(false);
+          Promise.resolve(form.mutate(ops, snapshot.revision)).then(function (landed) {
+            if (landed === true) setStaged({});
+            else setFailed(true);
+          }).catch(function () {
+            setFailed(true);
+          }).then(function () {
+            setSaving(false);
+          });
+        };
+
+        var onDiscard = function () {
+          setStaged({});
+          setFailed(false);
+        };
+
+        var fields = FIELDS.map(function (field) {
+          var draftInvalid = staged[field.name] !== undefined && parseDraft(textOf(field), field.kind, field.name) === undefined;
+          return react.createElement(primitives.SettingsValueField, {
+            key: field.name,
+            id: "plugin-config-ollama-" + field.name,
+            label: t(field.name),
+            hint: t(field.name + "Hint"),
+            overriddenLabel: t("overridden"),
+            resetLabel: t("reset"),
+            invalidLabel: t("invalidNumber"),
+            numeric: field.kind === "number",
+            disabled: !writable,
+            text: textOf(field),
+            overridden: false,
+            invalid: draftInvalid,
+            onEdit: function (next) {
+              setStaged(function (prev) {
+                var copy = Object.assign({}, prev);
+                copy[field.name] = next;
+                return copy;
+              });
+            },
+            onReset: function () {
+              setStaged(function (prev) {
+                var copy = Object.assign({}, prev);
+                copy[field.name] = formatValue(value[field.name], field.kind);
+                return copy;
+              });
+            }
+          });
+        });
+
+        fields.push(react.createElement(primitives.SettingsSecretField, {
+          key: "apiKey",
+          id: "plugin-config-ollama-apiKey",
+          label: t("apiKey"),
+          hint: t("apiKeyHint"),
+          disabled: !writable,
+          text: keyDraft === undefined ? "" : keyDraft,
+          configured: false,
+          stateLabel: t("apiKeyHint"),
+          onEdit: function (next) {
+            setStaged(function (prev) {
+              var copy = Object.assign({}, prev);
+              copy.apiKey = next;
+              return copy;
+            });
+          }
+        }));
+
+        return react.createElement(primitives.SettingsForm, {
+          labels: labels,
+          state: {
+            available: ready,
+            writable: writable,
+            dirty: dirty,
+            invalid: invalidFields.length > 0,
+            saving: saving,
+            failed: failed
+          },
+          onSave: onSave,
+          onDiscard: onDiscard
+        }, fields);
+      };
     }
 
-    // ── plugin ────────────────────────────────────────────────────────────
+    /** Required services (cordis fiber inject). */
+    var inject = ["slots", "locale", "configForms"];
+
+    /**
+     * Mount the row's configuration card while the Host serves the namespace.
+     * @param ctx - the browser plugin context.
+     */
     function apply(ctx) {
       var t = ctx.locale.bind(NS);
-      ctx.effect(function () { return ctx.locale.register(NS, { zh: zh, en: en }); }, "dsh-web-search-ollama-client: dictionaries");
-      var scope = ctx.settingsScope.bind({ namespace: "web-search-ollama" });
-      ctx.slots.inject("settings.plugin.item", function () {
-        return ctx.slots.register({
-          name: "settings.plugin.item",
-          id: "web-search-ollama",
-          key: "web-search-ollama",   // settings.plugin.item is a keyed slot; key = namespace
-          order: 30,
-          locale: NS,
-          inject: function () { return { hooks: {} }; }
-        }, function (props) {
-          return h(OllamaCard, Object.assign({}, props, { scope: scope }));
+      ctx.effect(function () {
+        return ctx.locale.register(NS, { zh: zh, en: en });
+      }, "web-search-ollama-client: dictionaries");
+      ctx.effect(function () {
+        return ctx.configForms.whileServed([TARGET_NS], function () {
+          return ctx.slots.inject("plugins.row.config", function () {
+            return ctx.slots.register({ name: "plugins.row.config", key: ROW_KEY }, makeCard(t));
+          });
         });
-      });
+      }, "web-search-ollama-client: row configuration");
     }
 
+    exports.NS = NS;
+    exports.TARGET_NS = TARGET_NS;
+    exports.ROW_KEY = ROW_KEY;
     exports.apply = apply;
     exports.inject = inject;
     return module.exports;

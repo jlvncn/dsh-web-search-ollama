@@ -1,6 +1,6 @@
 # dsh-web-search-ollama
 
-Ollama 云端搜索 / 抓取插件，用于 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DSH）的 `ctx.web` seam：把模型的联网搜索能力从官方 DeepSeek 搜索切换到 **Ollama 云端 API**（`/api/web_search` + `/api/web_fetch`），并在 **Web 侧边栏的 Plugins 页**提供配置表单（harness 依据宿主半的 schema 自动生成；保存即时生效、无需重启）。注意：`设置 → 插件设置` 从 **0.1.7 起是只读的插件清单**，可编辑的配置已迁到侧边栏 Plugins 页。
+Ollama 云端搜索 / 抓取插件，用于 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DSH）的 `ctx.web` seam：把模型的联网搜索能力从官方 DeepSeek 搜索切换到 **Ollama 云端 API**（`/api/web_search` + `/api/web_fetch`），并在 **Web 侧边栏的 Plugins 页**提供配置表单（组合包 → 行 → 「配置」；保存即时生效、无需重启）。注意：`设置 → 插件设置` 从 **0.1.7 起是只读的插件清单**。
 
 ## 特性
 
@@ -17,9 +17,9 @@ Ollama 云端搜索 / 抓取插件，用于 [DeepSeek Harness](https://github.co
 | 包 | 运行端 | 职责 |
 |---|---|---|
 | `dsh-web-search-ollama` | **host**（Node.js 进程） | 注册搜索 provider（抓取 provider 可选）、安装 `web-search-ollama` settings 命名空间 |
-| `dsh-web-search-ollama-client` | **client**（浏览器） | **0.1.7 起停用**：其注入的客户端 `settingsScope` 服务已被 `configForms` 取代，条目会一直 pending |
+| `dsh-web-search-ollama-client` | **client**（浏览器） | **v0.1.11 起按 0.1.7 契约重写**：注册键值插槽 `plugins.row.config`（key = `dsh-web-search-ollama#web-search-ollama`），在组合包的行上提供「配置」入口；用官方 `dsh-client-ui-primitives` 渲染表单 |
 
-> **v0.1.7 起浏览器半停用。** harness 0.1.7 把浏览器端配置机制从 `settingsScope` 换成 `configForms` + `plugins.item` 插槽，手写 bundle 不再适配（症状：`web boot: 1 entry did not activate`）。而宿主半的 `Config` schema 现在会被 harness 自动投影成「插件配置」页的表单（`autoGenerate: true`、`applies: live`），字段与旧卡片一致——功能等价，且不必再维护浏览器代码。因此 `scripts/install.sh` 与示例 patch 都不再安装/挂载 `dsh-web-search-ollama-client`（包保留在仓库，供回退或日后按新契约移植）。插件列表页现在只有 `web-search-ollama` 一个条目。
+> **浏览器半的 0.1.7 契约（v0.1.11 起生效）。** harness 0.1.7 把浏览器端配置机制从 `settingsScope` 换成 `configForms` + 键值插槽 `plugins.row.config`：**只有当客户端插件注册 `plugins.row.config`，键为 `<组合包名>#<行 id>`（这里是 `dsh-web-search-ollama#web-search-ollama`）时，Plugins 页的那一行才会出现「配置」控件**。描述符里的 `autoGenerate` 前端并不消费，没有自动兜底页 —— 所以 v0.1.7–v0.1.10 期间（浏览器半停用）配置表单在 UI 里**没有任何入口**，只能改 profile patch。v0.1.11 起浏览器半按新契约重写并注册该插槽，配置表单回到 Plugins 页。
 
 ## 目录结构
 
@@ -38,10 +38,10 @@ dsh-web-search-ollama/
     │   ├── package.json
     │   ├── index.js                    # 插件本体（搜索/抓取 provider）
     │   └── test.mjs                    # 模块形状测试
-    └── dsh-web-search-ollama-client/   # client 包（0.1.7 起停用，保留供回退/移植）
+    └── dsh-web-search-ollama-client/   # client 包（bundle + dsh.client；0.1.7 契约）
         ├── package.json
         ├── index.js                    # host half（空 apply，仅占位）
-        └── client.js                   # 旧浏览器 bundle（依赖已移除的 settingsScope）
+        └── client.js                   # 浏览器 bundle：注册 plugins.row.config + 表单
 ```
 
 ## 快速开始
@@ -75,7 +75,13 @@ dsh plugin --profile web add https://github.com/jlvncn/dsh-web-search-ollama/rel
 dsh plugin --profile web add 'git+ssh://git@github.com/jlvncn/dsh-web-search-ollama.git'
 ```
 
-或在 Web 里：**侧边栏 Plugins → Add plugin**（"Local plugin directory" 填上面的本地路径 / 或填 tarball URL）。装好后 `package.json` 的 `dsh.profile.bundles` 会多出 `dsh-web-search-ollama`，行由 bundle 的 patch 挂载，之后可以在 UI 里启停 / 卸载 / 看安装日志。
+**配置表单需要浏览器半，所以两个包都要装：**
+
+```bash
+dsh plugin --profile web add /path/to/dsh-web-search-ollama/packages/dsh-web-search-ollama-client
+```
+
+或在 Web 里：**侧边栏 Plugins → Add plugin**（"Local plugin directory" 依次填两个包目录 / 或填 tarball URL）。装好后 `dsh.profile.bundles` 会多出两个组合包，行由各自的 patch 挂载，之后可以在 UI 里启停 / 卸载 / 看安装日志；宿主包的行上会出现**「配置」**箭头。
 
 > bundle **只挂载自己那一行**，不抢 `web` seam：`searchProvider: ollama` / 停用内置 DeepSeek 搜索仍写在**你自己的 patch 层**（方式 A 的脚本会帮你写）。
 
@@ -223,7 +229,8 @@ pnpm test             # 模块形状测试 + provider 行为测试（test.mjs + 
 | `truncated` 由 seam 设置；`maxResults` 边界由 seam 强制 | ✅ provider 只做请求层优化 |
 | `peerDependencies` 声明支持的 dsh 范围（**组合期会校验**） | ✅ `>=0.1.7-rc.1 <0.2.0` |
 | 结构性字段不标 volatile ⇒ 不进配置表单 | ✅ `enableFetchProvider` |
-| 以 bundle 分发（`dsh.bundle.patch`），可被 `dsh plugin` / Web Plugins 页安装管理 | ✅ v0.1.9 起 |
+| 以 bundle 分发（`dsh.bundle.patch`），可被 `dsh plugin` / Web Plugins 页安装管理 | ✅ v0.1.9 起（host 与 client 两个包都是） |
+| 浏览器半注册键值插槽 `plugins.row.config`（key = `组合包名#行id`）才换来行上的「配置」入口 | ✅ v0.1.11 起 |
 
 ## 故障排查
 
@@ -231,7 +238,8 @@ pnpm test             # 模块形状测试 + provider 行为测试（test.mjs + 
 |---|---|
 | 搜索不生效，Plugins 页里没有该组合包/行 | 宿主包未装入 profile node_modules；`pluginInventory/list` 看不到条目 → 重跑 `./scripts/install.sh` |
 | 配置页看不到 `web-search-ollama` 表单 | `settings/describe` 里没有该命名空间 → 宿主包未 apply，或它的 `Config` schema 对 harness 不可见（v0.1.6 起 `Config` 同时挂在 default 导出上；查 `pluginInventory/list` 中 `web-search-ollama` 是否 active） |
-| UI 启动提示 `web boot: 1 entry did not activate`（`dsh-web-search-ollama-client … waiting for service: settingsScope`） | harness 0.1.7 已移除客户端 `settingsScope` 服务；删掉 profile patch 里 `web-search-ollama-client` 的 `insert` 条目（v0.1.7 的 `install.sh` 不再添加）后重启 |
+| UI 启动提示 `web boot: 1 entry did not activate` | 客户端条目等不到所需服务（0.1.7 之前是 `settingsScope`，现在应为 `slots`/`locale`/`configForms`）。先确认浏览器半版本与核心匹配：`dsh plugin --profile web add <client 包路径>` 重装 v0.1.11+ |
+| Plugins 页里组合包 `dsh-web-search-ollama` 的行**没有「配置」箭头** | 说明没有任何客户端插件注册 `plugins.row.config` 的 `dsh-web-search-ollama#web-search-ollama` 键 —— 浏览器半没装或没挂载：`dsh plugin --profile web add <client 包路径>`，然后刷新页面（必要时重启 dsh web） |
 | 以 `link:`/本地目录安装后**配置表单消失**、但搜索仍然可用 | 包自己解析到了没有 `volatile()` 的 schemastery（< 3.18.4），于是字段不再是 live ref，`volatileForm(schema)` 为空 → 该条目不进 `settings/describe`。v0.1.9 起 `dependencies` 已收敛为 `~3.18.4`；若手改过依赖，删掉包内 `node_modules/@deepseek-ai/schemastery` 重装即可 |
 | 插件行被组合期拒绝，报 `incompatible-version`（或该行被置为 `disabled`） | `peerDependencies` 里声明的 dsh 范围与运行期 `dsh --version` 不匹配（校验规则见 app-boot README §profiles）。换用与核心匹配的插件版本；确需放行要走 `dsh plugin --profile web allow-version <包@版本> --dsh-version <运行期版本> --accept-risk`（有风险，官方要求显式确认） |
 | 插件列表出现两个 ollama 条目 | 旧安装残留：profile patch 里还挂着 `web-search-ollama-client` → 删掉该条目；v0.1.7 起只有一个宿主条目 |
