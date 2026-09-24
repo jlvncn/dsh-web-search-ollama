@@ -33,9 +33,9 @@
 
 | 项 | 说明 |
 |---|---|
-| 本地 `live()` 包装 | `volatile()` 在 monorepo devDep 的 schemastery 3.18.1 里不存在（运行期用的是 harness 自带 3.18.4）。不包装则仓库内 `tsc`/测试无法运行；包装后旧 schemastery 退化为普通值。源码已标 TODO。 |
-| 本地 `Volatile<T>` 接口 | 本地 cordis 4.0.2 的 d.ts 未导出该类型；结构与官方一致，源码已标 TODO。 |
-| `dependencies` 仍为 `@deepseek-ai/schemastery: ^3.18.1` | 官方 in-tree 包写 `~3.18.4`。`^3.18.1` 允许新装取到 3.18.4+，而收敛到 `~3.18.4` 需连带刷新 monorepo devDeps/lock；本次不做，留待 devDeps 整体升级。 |
+| ~~本地 `live()` 包装~~ | **已删除（v0.1.9）**：devDeps 升到 schemastery `~3.18.4` 后直接链式 `.volatile()`。 |
+| ~~本地 `Volatile<T>` 接口~~ | **已删除（v0.1.9）**：改 `import type { Context, Volatile } from '@deepseek-ai/cordis'`。 |
+| ~~`dependencies` 为 `^3.18.1`~~ | **已收敛为 `~3.18.4`（v0.1.9）**。这不是洁癖：链接安装时 `^3.18.1` 会解析到没有 `volatile()` 的 3.18.1，导致配置表单**静默消失**（实测于临时 profile，见下）。 |
 | `types` 指向 `./src/index.ts` | 官方发布编译产物 `lib/types/*.d.ts`；本项目以 `src` 为类型入口（`files` 已包含 `src`），对 TS 消费者可用。 |
 
 ## 4. 验证记录（2026-09-24，v0.1.8）
@@ -48,3 +48,5 @@
 | 运行期加载 | `dsh web --port 0` + `pluginInventory/list` | host 条目 active，无 pending，无诊断文件 |
 | 配置表单 | `settings/describe` | `web-search-ollama` 在列，`autoGenerate: true`、`applies: live` |
 | peer 校验 | 组合期校验（app-boot）随启动进行 | 未被拒绝（范围 `>=0.1.7-rc.1 <0.2.0` 匹配运行期） |
+| **bundle 安装（v0.1.9）** | 临时 profile：`dsh plugin --profile scratch add <本地目录>` | bundle 自动选中；行 active；`settings/describe` 含 8 字段；无诊断文件 |
+| **shim 删除后回归（v0.1.9）** | 同上（包以 `link:` 安装，解析 schemastery 3.18.4） | 表单命名空间回归（修掉了「链接安装下表单静默消失」） |

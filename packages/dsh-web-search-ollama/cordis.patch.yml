@@ -1,0 +1,29 @@
+# =============================================================================
+# dsh-web-search-ollama — bundle patch
+#
+# Shipped as this package's `dsh.bundle.patch` (see package.json), so installing
+# the package as a profile bundle mounts its own loader entry. The provider swap
+# is deliberately NOT here: a bundle that seizes the `web` seam for every profile
+# would be a surprising install. Put these two rows in your own patch layer when
+# you want Ollama to answer `web_search` (the copy-based install.sh does this for
+# you):
+#
+#   - id: web
+#     config:
+#       searchProvider: ollama
+#       fetchProvider: http
+#   - id: web-search-deepseek
+#     disabled: true
+#
+# The entry's Config schema is what the built-in plugin manager renders as its
+# "插件配置" form (harness >= 0.1.7); every field except `enableFetchProvider`
+# is live (volatile).
+# =============================================================================
+- insert:
+    - id: web-search-ollama
+      name: dsh-web-search-ollama
+      config:
+        baseURL: https://ollama.com
+        searchPath: /api/web_search
+        fetchPath: /api/web_fetch
+        apiKeyEnv: OLLAMA_API_KEY

@@ -62,6 +62,23 @@ dsh-web-search-ollama/
 1. 把宿主包复制到 `$DSH_HOME/profiles/node_modules/`；
 2. 把 `profile/cordis.patch.yml` 合并进 `$DSH_HOME/profiles/<profile>/cordis.patch.yml`（已有条目则跳过；改动前自动备份）。
 
+**方式 A′ — bundle 安装（v0.1.9 起，推荐，可在 Web 里管理）**
+
+包自带 `dsh.bundle.patch`，所以 profile 的包管理器能直接安装并挂载它（**不需要 npm 发布**，三条通道任选）：
+
+```bash
+# 本地目录（link，离线可用）
+dsh plugin --profile web add /path/to/dsh-web-search-ollama/packages/dsh-web-search-ollama
+# tarball（GitHub Release 附件）
+dsh plugin --profile web add https://github.com/jlvncn/dsh-web-search-ollama/releases/download/v0.1.9/dsh-web-search-ollama-0.1.9.tgz
+# git 地址（注意会跑包内 prepare = tsc，会拉 typescript devDep）
+dsh plugin --profile web add 'git+ssh://git@github.com/jlvncn/dsh-web-search-ollama.git'
+```
+
+或在 Web 里：**侧边栏 Plugins → Add plugin**（"Local plugin directory" 填上面的本地路径 / 或填 tarball URL）。装好后 `package.json` 的 `dsh.profile.bundles` 会多出 `dsh-web-search-ollama`，行由 bundle 的 patch 挂载，之后可以在 UI 里启停 / 卸载 / 看安装日志。
+
+> bundle **只挂载自己那一行**，不抢 `web` seam：`searchProvider: ollama` / 停用内置 DeepSeek 搜索仍写在**你自己的 patch 层**（方式 A 的脚本会帮你写）。
+
 **方式 B — pnpm workspace 链接**
 
 把本仓库作为 pnpm workspace 加入你的 DSH profile，然后让 loader 以包名解析（见下方 patch）。适合想保持源码可编辑的场景。
@@ -206,6 +223,7 @@ pnpm test             # 模块形状测试 + provider 行为测试（test.mjs + 
 | `truncated` 由 seam 设置；`maxResults` 边界由 seam 强制 | ✅ provider 只做请求层优化 |
 | `peerDependencies` 声明支持的 dsh 范围（**组合期会校验**） | ✅ `>=0.1.7-rc.1 <0.2.0` |
 | 结构性字段不标 volatile ⇒ 不进配置表单 | ✅ `enableFetchProvider` |
+| 以 bundle 分发（`dsh.bundle.patch`），可被 `dsh plugin` / Web Plugins 页安装管理 | ✅ v0.1.9 起 |
 
 ## 故障排查
 
@@ -214,6 +232,7 @@ pnpm test             # 模块形状测试 + provider 行为测试（test.mjs + 
 | 搜索不生效，插件配置页没有该条目 | 宿主包未装入 profile node_modules；`pluginInventory/list` 看不到条目 → 重跑 `./scripts/install.sh` |
 | 配置页看不到 `web-search-ollama` 表单 | `settings/describe` 里没有该命名空间 → 宿主包未 apply，或它的 `Config` schema 对 harness 不可见（v0.1.6 起 `Config` 同时挂在 default 导出上；查 `pluginInventory/list` 中 `web-search-ollama` 是否 active） |
 | UI 启动提示 `web boot: 1 entry did not activate`（`dsh-web-search-ollama-client … waiting for service: settingsScope`） | harness 0.1.7 已移除客户端 `settingsScope` 服务；删掉 profile patch 里 `web-search-ollama-client` 的 `insert` 条目（v0.1.7 的 `install.sh` 不再添加）后重启 |
+| 以 `link:`/本地目录安装后**配置表单消失**、但搜索仍然可用 | 包自己解析到了没有 `volatile()` 的 schemastery（< 3.18.4），于是字段不再是 live ref，`volatileForm(schema)` 为空 → 该条目不进 `settings/describe`。v0.1.9 起 `dependencies` 已收敛为 `~3.18.4`；若手改过依赖，删掉包内 `node_modules/@deepseek-ai/schemastery` 重装即可 |
 | 插件行被组合期拒绝，报 `incompatible-version`（或该行被置为 `disabled`） | `peerDependencies` 里声明的 dsh 范围与运行期 `dsh --version` 不匹配（校验规则见 app-boot README §profiles）。换用与核心匹配的插件版本；确需放行要走 `dsh plugin --profile web allow-version <包@版本> --dsh-version <运行期版本> --accept-risk`（有风险，官方要求显式确认） |
 | 插件列表出现两个 ollama 条目 | 旧安装残留：profile patch 里还挂着 `web-search-ollama-client` → 删掉该条目；v0.1.7 起只有一个宿主条目 |
 | **旧会话打不开，报 `web/deepseek-search-llm-request … body has unexpected member "query"`** | v0.1.5 之前插件把 Ollama 请求写成官方事件，导致含该事件的 **v0 格式**会话无法通过 v0→v1 迁移。升级到 v0.1.5（不再写任何会话事件）即可止住新增；**已在磁盘上的历史 v0 会话需要单独做一次性 v0→v3 迁移**，升级插件本身不会修复它们。 |

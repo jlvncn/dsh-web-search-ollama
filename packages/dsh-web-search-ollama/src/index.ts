@@ -42,22 +42,9 @@
 
 import Schema from '@deepseek-ai/schemastery';
 import { WebError } from '@deepseek-ai/dsh-web';
-import type { Context } from '@deepseek-ai/cordis';
+import type { Context, Volatile } from '@deepseek-ai/cordis';
 import type { WebSearchProvider, WebSearchRequest, WebSearchResult, WebSearchSource,
   WebFetchProvider, WebFetchRequest, WebFetchResult, WebFetchBody } from '@deepseek-ai/dsh-web';
-
-/**
- * Mark a Config field live: harness >= 0.1.7 resolves `volatile()` fields as
- * refs that track the settings service, which is what makes the plugin
- * configuration form's edits apply without a reload. Tolerates a schemastery that predates the
- * marker (the monorepo's devDep 3.18.1, versus the harness' own 3.18.4) so the
- * module still loads there; the field is then a plain value, as before 0.1.7.
- * TODO: drop the local type shim once the monorepo devDeps reach the 0.1.7 range.
- */
-const live = <S>(schema: S): S => {
-  const marker = (schema as unknown as { volatile?(): S }).volatile;
-  return typeof marker === 'function' ? marker.call(schema) : schema;
-};
 
 const name = 'web-search-ollama';
 const inject = ['web'];
@@ -74,21 +61,21 @@ const DEFAULT_API_VERSION = 'v1';
 
 const ConfigSchema = Schema.object({
   /** Literal API key; wins over `apiKeyEnv`. Never rides a describe() response. */
-  apiKey: live(Schema.string().role('secret')),
+  apiKey: Schema.string().role('secret').volatile(),
   /** Credential reference resolved per operation; defaults to OLLAMA_API_KEY. */
-  apiKeyEnv: live(Schema.string().role('credential-ref').default(DEFAULT_API_KEY_ENV)),
+  apiKeyEnv: Schema.string().role('credential-ref').default(DEFAULT_API_KEY_ENV).volatile(),
   /** Ollama API root; `/api/web_search` and `/api/web_fetch` are appended via the paths below. */
-  baseURL: live(Schema.string().default(DEFAULT_BASE_URL)),
-  searchPath: live(Schema.string().default(DEFAULT_SEARCH_PATH)),
-  fetchPath: live(Schema.string().default(DEFAULT_FETCH_PATH)),
+  baseURL: Schema.string().default(DEFAULT_BASE_URL).volatile(),
+  searchPath: Schema.string().default(DEFAULT_SEARCH_PATH).volatile(),
+  fetchPath: Schema.string().default(DEFAULT_FETCH_PATH).volatile(),
   /** Retained for config compatibility; the plugin no longer writes session events. */
-  apiVersion: live(Schema.string().default(DEFAULT_API_VERSION)),
+  apiVersion: Schema.string().default(DEFAULT_API_VERSION).volatile(),
   /** Cap on the per-source snippet length (search). */
-  snippetMax: live(Schema.number().step(1).min(1).default(DEFAULT_SNIPPET_MAX)),
+  snippetMax: Schema.number().step(1).min(1).default(DEFAULT_SNIPPET_MAX).volatile(),
   /** Abort timeout for search operations (ms). */
-  searchTimeoutMs: live(Schema.number().step(1).min(1).default(DEFAULT_SEARCH_TIMEOUT_MS)),
+  searchTimeoutMs: Schema.number().step(1).min(1).default(DEFAULT_SEARCH_TIMEOUT_MS).volatile(),
   /** Abort timeout for fetch operations (ms). */
-  fetchTimeoutMs: live(Schema.number().step(1).min(1).default(DEFAULT_FETCH_TIMEOUT_MS)),
+  fetchTimeoutMs: Schema.number().step(1).min(1).default(DEFAULT_FETCH_TIMEOUT_MS).volatile(),
   /**
    * Register the Ollama fetch provider on `ctx.web`. Off by default: the
    * built-in generic `http` fetch provider covers public URLs, and registering
@@ -97,18 +84,6 @@ const ConfigSchema = Schema.object({
    */
   enableFetchProvider: Schema.boolean().default(false),
 });
-
-/**
- * One live Config field on harness >= 0.1.7: the loader hands `volatile()`
- * fields over as refs, and `get()` reads the value the settings form last
- * saved. Structurally identical to the harness' own `Volatile<T>`
- * (`@deepseek-ai/cordis` re-exports it from cosmokit); declared locally only
- * because the monorepo's devDeps predate it.
- * TODO: import it from `@deepseek-ai/cordis` once the devDeps reach 0.1.7.
- */
-interface Volatile<T> {
-  get(): T;
-}
 
 /**
  * The plugin's Config, as the harness hands it to `apply`: every editable field

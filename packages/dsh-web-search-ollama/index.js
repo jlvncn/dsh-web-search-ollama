@@ -1,9 +1,5 @@
 import Schema from '@deepseek-ai/schemastery';
 import { WebError } from '@deepseek-ai/dsh-web';
-const live = (schema) => {
-    const marker = schema.volatile;
-    return typeof marker === 'function' ? marker.call(schema) : schema;
-};
 const name = 'web-search-ollama';
 const inject = ['web'];
 const DEFAULT_API_KEY_ENV = 'OLLAMA_API_KEY';
@@ -15,15 +11,15 @@ const DEFAULT_SEARCH_TIMEOUT_MS = 30000;
 const DEFAULT_FETCH_TIMEOUT_MS = 15000;
 const DEFAULT_API_VERSION = 'v1';
 const ConfigSchema = Schema.object({
-    apiKey: live(Schema.string().role('secret')),
-    apiKeyEnv: live(Schema.string().role('credential-ref').default(DEFAULT_API_KEY_ENV)),
-    baseURL: live(Schema.string().default(DEFAULT_BASE_URL)),
-    searchPath: live(Schema.string().default(DEFAULT_SEARCH_PATH)),
-    fetchPath: live(Schema.string().default(DEFAULT_FETCH_PATH)),
-    apiVersion: live(Schema.string().default(DEFAULT_API_VERSION)),
-    snippetMax: live(Schema.number().step(1).min(1).default(DEFAULT_SNIPPET_MAX)),
-    searchTimeoutMs: live(Schema.number().step(1).min(1).default(DEFAULT_SEARCH_TIMEOUT_MS)),
-    fetchTimeoutMs: live(Schema.number().step(1).min(1).default(DEFAULT_FETCH_TIMEOUT_MS)),
+    apiKey: Schema.string().role('secret').volatile(),
+    apiKeyEnv: Schema.string().role('credential-ref').default(DEFAULT_API_KEY_ENV).volatile(),
+    baseURL: Schema.string().default(DEFAULT_BASE_URL).volatile(),
+    searchPath: Schema.string().default(DEFAULT_SEARCH_PATH).volatile(),
+    fetchPath: Schema.string().default(DEFAULT_FETCH_PATH).volatile(),
+    apiVersion: Schema.string().default(DEFAULT_API_VERSION).volatile(),
+    snippetMax: Schema.number().step(1).min(1).default(DEFAULT_SNIPPET_MAX).volatile(),
+    searchTimeoutMs: Schema.number().step(1).min(1).default(DEFAULT_SEARCH_TIMEOUT_MS).volatile(),
+    fetchTimeoutMs: Schema.number().step(1).min(1).default(DEFAULT_FETCH_TIMEOUT_MS).volatile(),
     enableFetchProvider: Schema.boolean().default(false),
 });
 function snapshot(config) {
