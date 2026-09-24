@@ -1,8 +1,11 @@
 import Schema from '@deepseek-ai/schemastery';
 import { WebError } from '@deepseek-ai/dsh-web';
+const live = (schema) => {
+    const marker = schema.volatile;
+    return typeof marker === 'function' ? marker.call(schema) : schema;
+};
 const name = 'web-search-ollama';
 const inject = ['web'];
-const NS = 'web-search-ollama';
 const DEFAULT_API_KEY_ENV = 'OLLAMA_API_KEY';
 const DEFAULT_BASE_URL = 'https://ollama.com';
 const DEFAULT_SEARCH_PATH = '/api/web_search';
@@ -12,17 +15,30 @@ const DEFAULT_SEARCH_TIMEOUT_MS = 30000;
 const DEFAULT_FETCH_TIMEOUT_MS = 15000;
 const DEFAULT_API_VERSION = 'v1';
 const ConfigSchema = Schema.object({
-    apiKey: Schema.string().role('secret'),
-    apiKeyEnv: Schema.string().role('credential-ref').default(DEFAULT_API_KEY_ENV),
-    baseURL: Schema.string().default(DEFAULT_BASE_URL),
-    searchPath: Schema.string().default(DEFAULT_SEARCH_PATH),
-    fetchPath: Schema.string().default(DEFAULT_FETCH_PATH),
-    apiVersion: Schema.string().default(DEFAULT_API_VERSION),
-    snippetMax: Schema.number().step(1).min(1).default(DEFAULT_SNIPPET_MAX),
-    searchTimeoutMs: Schema.number().step(1).min(1).default(DEFAULT_SEARCH_TIMEOUT_MS),
-    fetchTimeoutMs: Schema.number().step(1).min(1).default(DEFAULT_FETCH_TIMEOUT_MS),
+    apiKey: live(Schema.string().role('secret')),
+    apiKeyEnv: live(Schema.string().role('credential-ref').default(DEFAULT_API_KEY_ENV)),
+    baseURL: live(Schema.string().default(DEFAULT_BASE_URL)),
+    searchPath: live(Schema.string().default(DEFAULT_SEARCH_PATH)),
+    fetchPath: live(Schema.string().default(DEFAULT_FETCH_PATH)),
+    apiVersion: live(Schema.string().default(DEFAULT_API_VERSION)),
+    snippetMax: live(Schema.number().step(1).min(1).default(DEFAULT_SNIPPET_MAX)),
+    searchTimeoutMs: live(Schema.number().step(1).min(1).default(DEFAULT_SEARCH_TIMEOUT_MS)),
+    fetchTimeoutMs: live(Schema.number().step(1).min(1).default(DEFAULT_FETCH_TIMEOUT_MS)),
     enableFetchProvider: Schema.boolean().default(false),
 });
+function unwrap(value) {
+    return value !== null && typeof value === 'object'
+        && typeof value.get === 'function'
+        ? value.get()
+        : value;
+}
+function unwrapConfig(config) {
+    const source = config;
+    const out = {};
+    for (const key of Object.keys(source))
+        out[key] = unwrap(source[key]);
+    return out;
+}
 function ambientEnv(ctx, name) {
     const snapshot = ctx.get('launchEnvironment');
     const resolved = snapshot?.get?.(name)?.value;
@@ -291,17 +307,10 @@ class OllamaFetchProvider {
     }
 }
 function apply(ctx, config) {
-    let current = () => config;
-    ctx.inject(['settings'], (settingsCtx) => {
-        settingsCtx.settings.installSection(ctx, NS, ConfigSchema, config, {
-            setSource: (source) => { current = source; },
-            onChange: () => { },
-        });
-    });
-    ctx.web.registerSearchProvider(new OllamaSearchProvider(() => resolveOptions(ctx, current())));
-    if (config.enableFetchProvider === true) {
-        ctx.web.registerFetchProvider(new OllamaFetchProvider(() => resolveOptions(ctx, current())));
+    ctx.web.registerSearchProvider(new OllamaSearchProvider(() => resolveOptions(ctx, unwrapConfig(config))));
+    if (unwrapConfig(config).enableFetchProvider === true) {
+        ctx.web.registerFetchProvider(new OllamaFetchProvider(() => resolveOptions(ctx, unwrapConfig(config))));
     }
 }
 export { ConfigSchema as Config };
-export default { name, inject, apply };
+export default { name, inject, Config: ConfigSchema, apply };
