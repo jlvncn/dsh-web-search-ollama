@@ -69,8 +69,8 @@ dsh-web-search-ollama/
 ```bash
 # 本地目录（link，离线可用）
 dsh plugin --profile web add /path/to/dsh-web-search-ollama/packages/dsh-web-search-ollama
-# tarball（GitHub Release 附件）
-dsh plugin --profile web add https://github.com/jlvncn/dsh-web-search-ollama/releases/download/v0.1.9/dsh-web-search-ollama-0.1.9.tgz
+# tarball（GitHub Release 附件；v0.1.11 起每次发布 Release 时由 CI 自动附挂双包 .tgz）
+dsh plugin --profile web add https://github.com/jlvncn/dsh-web-search-ollama/releases/download/v0.1.11/dsh-web-search-ollama-0.1.11.tgz
 # git 地址（注意会跑包内 prepare = tsc，会拉 typescript devDep）
 dsh plugin --profile web add 'git+ssh://git@github.com/jlvncn/dsh-web-search-ollama.git'
 ```
@@ -79,6 +79,8 @@ dsh plugin --profile web add 'git+ssh://git@github.com/jlvncn/dsh-web-search-oll
 
 ```bash
 dsh plugin --profile web add /path/to/dsh-web-search-ollama/packages/dsh-web-search-ollama-client
+# 或 tarball：
+dsh plugin --profile web add https://github.com/jlvncn/dsh-web-search-ollama/releases/download/v0.1.11/dsh-web-search-ollama-client-0.1.11.tgz
 ```
 
 或在 Web 里：**侧边栏 Plugins → Add plugin**（"Local plugin directory" 依次填两个包目录 / 或填 tarball URL）。装好后 `dsh.profile.bundles` 会多出两个组合包，行由各自的 patch 挂载，之后可以在 UI 里启停 / 卸载 / 看安装日志；宿主包的行上会出现**「配置」**箭头。
