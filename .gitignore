@@ -34,6 +34,11 @@ lerna-debug.log*
 tmp/
 temp/
 
+# ---- Build / pack artifacts -------------------------------------------------
+# `pnpm pack` output (CI attaches these to GitHub Releases; never committed).
+dist/
+*.tgz
+
 # ---- Secrets ----------------------------------------------------------------
 # Local environment and credential files must never be committed. GitHub push
 # protection only recognizes provider-shaped tokens (sk-, ghp_, …), so this

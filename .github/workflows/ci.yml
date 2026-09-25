@@ -1,0 +1,85 @@
+# CI for the dsh-web-search-ollama monorepo.
+#
+# Two independent jobs:
+#
+#   test          — on every push to main and every pull request:
+#                   install (frozen lockfile), run the module-shape and
+#                   provider-behavior tests, then rebuild the host package
+#                   with tsc and fail if the committed index.js differs
+#                   (the compiled output is checked in on purpose: the
+#                   package ships zero-build).
+#
+#   release-tgz   — when a GitHub Release is published: pack both npm
+#                   packages and attach the tarballs to that Release, so
+#                   the README's tarball install channel always has
+#                   current assets (`dsh plugin add <release .tgz URL>`).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    if: github.event_name != 'release'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Reads the packageManager field from the root package.json.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # The host package requires Node >= 20.3 (AbortSignal.any).
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Test (module shape + provider behavior)
+        run: pnpm test
+
+      - name: Build sync check (committed index.js == tsc output)
+        run: |
+          pnpm build
+          git diff --exit-code packages/dsh-web-search-ollama/index.js
+
+  release-tgz:
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Pack both packages
+        run: |
+          mkdir -p "$PWD/dist"
+          pnpm --filter dsh-web-search-ollama pack --pack-destination "$PWD/dist"
+          pnpm --filter dsh-web-search-ollama-client pack --pack-destination "$PWD/dist"
+          ls -la dist/
+
+      - name: Attach tarballs to the Release
+        run: gh release upload "${{ github.event.release.tag_name }}" dist/*.tgz --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
