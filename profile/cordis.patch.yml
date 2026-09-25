@@ -1,5 +1,5 @@
 # =============================================================================
-# dsh-web-search-ollama — loader patch for a DeepSeek Harness profile
+# @jlvncn/dsh-web-search-ollama — loader patch for a DeepSeek Harness profile
 #
 # Merge this file's entries into your profile's cordis.patch.yml
 # ($DSH_HOME/profiles/<profile>/cordis.patch.yml), or let scripts/install.sh
@@ -16,11 +16,11 @@
 #                                          >= 0.1.7 renders it only when this
 #                                          package registers the keyed slot
 #                                          `plugins.row.config` (key
-#                                          `dsh-web-search-ollama#web-search-ollama`).
+#                                          `@jlvncn/dsh-web-search-ollama#web-search-ollama`).
 #
 # Requires both packages under the profile's node_modules:
-#   $DSH_HOME/profiles/node_modules/dsh-web-search-ollama/
-#   $DSH_HOME/profiles/node_modules/dsh-web-search-ollama-client/
+#   $DSH_HOME/profiles/node_modules/@jlvncn/dsh-web-search-ollama/
+#   $DSH_HOME/profiles/node_modules/@jlvncn/dsh-web-search-ollama-client/
 # =============================================================================
 
 # Use the Ollama-backed search provider instead of the built-in DeepSeek one.
@@ -46,7 +46,7 @@
     # name (resolvable from the profile's node_modules) so the loader
     # inventory shows a proper name instead of a raw file path.
     - id: web-search-ollama
-      name: 'dsh-web-search-ollama'
+      name: '@jlvncn/dsh-web-search-ollama'
       config:
         baseURL: https://ollama.com
         searchPath: /api/web_search
@@ -57,4 +57,4 @@
     # be mounted as a package name so the client-modules scanner finds its
     # `dsh.client` declaration and serves its `./client` bundle.
     - id: web-search-ollama-client
-      name: 'dsh-web-search-ollama-client'
+      name: '@jlvncn/dsh-web-search-ollama-client'

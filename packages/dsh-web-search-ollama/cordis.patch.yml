@@ -1,5 +1,5 @@
 # =============================================================================
-# dsh-web-search-ollama — bundle patch
+# @jlvncn/dsh-web-search-ollama — bundle patch
 #
 # Shipped as this package's `dsh.bundle.patch` (see package.json), so installing
 # the package as a profile bundle mounts its own loader entry. The provider swap
@@ -21,7 +21,7 @@
 # =============================================================================
 - insert:
     - id: web-search-ollama
-      name: dsh-web-search-ollama
+      name: '@jlvncn/dsh-web-search-ollama'
       config:
         baseURL: https://ollama.com
         searchPath: /api/web_search

@@ -1,6 +1,6 @@
 # CI for the dsh-web-search-ollama monorepo.
 #
-# Two independent jobs:
+# Three independent jobs:
 #
 #   test          — on every push to main and every pull request:
 #                   install (frozen lockfile), run the module-shape and
@@ -13,6 +13,11 @@
 #                   packages and attach the tarballs to that Release, so
 #                   the README's tarball install channel always has
 #                   current assets (`dsh plugin add <release .tgz URL>`).
+#
+#   npm-publish   — when a GitHub Release is published AND the NPM_TOKEN
+#                   repository secret exists: publish both scoped packages
+#                   (@jlvncn/…) to npmjs.org with provenance (OIDC).
+#                   Skipped silently when no token is configured.
 name: CI
 
 on:
@@ -75,11 +80,49 @@ jobs:
       - name: Pack both packages
         run: |
           mkdir -p "$PWD/dist"
-          pnpm --filter dsh-web-search-ollama pack --pack-destination "$PWD/dist"
-          pnpm --filter dsh-web-search-ollama-client pack --pack-destination "$PWD/dist"
+          pnpm --filter @jlvncn/dsh-web-search-ollama pack --pack-destination "$PWD/dist"
+          pnpm --filter @jlvncn/dsh-web-search-ollama-client pack --pack-destination "$PWD/dist"
           ls -la dist/
 
       - name: Attach tarballs to the Release
         run: gh release upload "${{ github.event.release.tag_name }}" dist/*.tgz --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  npm-publish:
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # npm provenance (OIDC)
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Publish both packages (skipped without NPM_TOKEN)
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "$NPM_TOKEN" ]; then
+            echo "NPM_TOKEN secret not configured — skipping npm publish."
+            echo "(Publish locally with 'npm publish', or add a granular"
+            echo " publish token as the NPM_TOKEN repository secret.)"
+            exit 0
+          fi
+          echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" >> "$HOME/.npmrc"
+          cd packages/dsh-web-search-ollama
+          npm publish --provenance --access public
+          cd ../dsh-web-search-ollama-client
+          npm publish --provenance --access public

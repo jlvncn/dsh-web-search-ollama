@@ -2,6 +2,22 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [0.1.12] - 2026-09-25
+
+**npm 包改名为 scoped 名**：`dsh-web-search-ollama` → **`@jlvncn/dsh-web-search-ollama`**，`dsh-web-search-ollama-client` → **`@jlvncn/dsh-web-search-ollama-client`**。原因：无 scope 的原包名已于 2026-08-25 被第三方（npm 用户 `sryimnoob`，仓库 `sryimnoob123/dsh-web-search-ollama`，非 fork）抢注发布——该包借鉴了本项目 v0.1.1 的自创错误码（`WEB_PROVIDER_CREDENTIAL_MISSING`）与 `apiKeyEnv` 字段名但无任何署名，代码为独立重写，且其 peerDependencies 死锁 `0.1.1-rc.2`、在 dsh ≥ 0.1.2 上会被组合期校验拒绝。scope 与 npm 账号绑定、不可被抢注，改名后本项目可正式发布到 npm registry（第四条安装通道）。
+
+### Changed
+
+- 两个包的 `name` 改为 scoped；GitHub 仓库名与仓库内目录名**不变**。
+- 浏览器半联动：`client.js` 的 ModuleLoader `id` 与 `ROW_KEY` 改为 `@jlvncn/dsh-web-search-ollama-client` / `@jlvncn/dsh-web-search-ollama#web-search-ollama`（键的前半段 = 组合包名，插件管理器源码 `rowConfigKey(pkg.name, rowId)` 就是简单拼接，scoped 名兼容）。**loader 行 id 与 settings 命名空间 `web-search-ollama` 不变**，已有配置无损保留。
+- `scripts/install.sh` 与 `profile/cordis.patch.yml` 适配 scoped 布局（`node_modules/@jlvncn/…`，patch 的 `name:` 带引号——YAML 中 `@` 开头必须引用）。
+- 两个包的 `publishConfig` 增加 `registry: https://registry.npmjs.org`：本机 `~/.npmrc` 默认源是 npmmirror 镜像，发布必须显式走官方源。
+- CI 新增 `npm-publish` job：发布 Release 时若配置了 `NPM_TOKEN` secret 则以 **npm provenance**（OIDC 可验证构建来源）发布双包；未配置则静默跳过。`release-tgz` 的 pack filter 同步改名。
+
+### Notes
+
+- 从旧版本升级：删除 profile patch / bundle 里指向旧包名的条目（或 `dsh plugin remove dsh-web-search-ollama dsh-web-search-ollama-client`），再按新名重装；`$DSH_HOME/profiles/node_modules/` 下的旧目录与旧 scoped 目录并存无害，可手动删除。
+
 ## [0.1.11] - 2026-09-25
 
 修正 v0.1.7 的判断错误：**0.1.7 并没有"由内置表单自动接管"**。行配置控件只在客户端插件注册键值插槽 `plugins.row.config`（键 = `<组合包名>#<行 id>`）时出现，描述符里的 `autoGenerate` 前端无人消费、没有兜底页。v0.1.7–v0.1.10 期间因此**配置表单在 UI 里没有任何入口**（命名空间仍在服务端提供，只是没人指向它）。本版把浏览器半按 0.1.7 契约重写并重新挂载。
@@ -206,6 +222,7 @@ v0.1.6 的后续补丁：**停用浏览器半**。宿主半在 0.1.7 下已正�
 - 默认联网搜索从内置 DeepSeek 搜索切换到 Ollama 云端（需配置 `OLLAMA_API_KEY`；内置 `web-search-deepseek` 默认停用）。
 - host 插件由本地文件加载改为正式 npm 包 `dsh-web-search-ollama`（peerDependencies：`dsh-settings`、`dsh-web`；dependencies：`schemastery`）。
 
+[0.1.12]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.12
 [0.1.11]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.11
 [0.1.10]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.10
 [0.1.9]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.9

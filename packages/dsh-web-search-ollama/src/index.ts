@@ -1,5 +1,5 @@
 /**
- * dsh-web-search-ollama
+ * @jlvncn/dsh-web-search-ollama
  *
  * An Ollama-backed web capability plugin for the DeepSeek Harness `ctx.web`
  * seam. Modeled on @deepseek-ai/dsh-web-search-deepseek: it exposes a

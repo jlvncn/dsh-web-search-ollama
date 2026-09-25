@@ -1,8 +1,8 @@
 /**
- * dsh-web-search-ollama-client — browser half.
+ * @jlvncn/dsh-web-search-ollama-client — browser half.
  *
  * Registers the "row configuration" page of the plugin's own loader row on the
- * Web UI's Plugins page: bundle `dsh-web-search-ollama` → row
+ * Web UI's Plugins page: bundle `@jlvncn/dsh-web-search-ollama` → row
  * `web-search-ollama` → the configure control opens this card.
  *
  * Harness >= 0.1.7 contract (see the slot contract shipped by
@@ -17,7 +17,7 @@
  * Hand-written ModuleLoader bundle — no build step required.
  */
 window.__ModuleLoader__.load({
-  id: "dsh-web-search-ollama-client",
+  id: "@jlvncn/dsh-web-search-ollama-client",
   factory: (require) => {
     var module = { exports: {} };
     var exports = module.exports;
@@ -30,7 +30,7 @@ window.__ModuleLoader__.load({
     /** Settings namespace (the loader entry id) this card edits. */
     var TARGET_NS = "web-search-ollama";
     /** Slot key: `<bundle package name>#<row id>`, as the bundle's patch declares them. */
-    var ROW_KEY = "dsh-web-search-ollama#web-search-ollama";
+    var ROW_KEY = "@jlvncn/dsh-web-search-ollama#web-search-ollama";
 
     var zh = {
       title: "Ollama 网页搜索",

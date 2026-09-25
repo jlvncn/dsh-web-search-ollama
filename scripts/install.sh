@@ -8,7 +8,7 @@
 # The browser half is what puts the configure control on the host plugin's row
 # on the Plugins page: harness >= 0.1.7 shows that control only when a client
 # plugin registers the keyed slot `plugins.row.config` under the key
-# `dsh-web-search-ollama#web-search-ollama`.
+# `@jlvncn/dsh-web-search-ollama#web-search-ollama`.
 #
 # Usage:
 #   ./scripts/install.sh            # install into the default "web" profile
@@ -16,9 +16,9 @@
 #
 # No network access is required — the packages are copied verbatim from this
 # repo. After installing, (re)start `dsh web` and open
-# Web sidebar -> Plugins -> bundle dsh-web-search-ollama -> row web-search-ollama
-#   -> Configure   to configure (harness >= 0.1.7; the Settings plugin list is
-#   read-only and holds no editable forms).
+# Web sidebar -> Plugins -> bundle @jlvncn/dsh-web-search-ollama -> row
+#   web-search-ollama -> Configure   to configure (harness >= 0.1.7; the
+#   Settings plugin list is read-only and holds no editable forms).
 # =============================================================================
 set -euo pipefail
 
@@ -31,23 +31,26 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HOST_PKG="$REPO_DIR/packages/dsh-web-search-ollama"
 CLIENT_PKG="$REPO_DIR/packages/dsh-web-search-ollama-client"
 PATCH_SRC="$REPO_DIR/profile/cordis.patch.yml"
+# npm packages are scoped (@jlvncn/...), so they install under a scope dir.
+HOST_DST="$NM_DIR/@jlvncn/dsh-web-search-ollama"
+CLIENT_DST="$NM_DIR/@jlvncn/dsh-web-search-ollama-client"
 
-echo "==> Installing dsh-web-search-ollama into profile '$PROFILE'"
+echo "==> Installing @jlvncn/dsh-web-search-ollama into profile '$PROFILE'"
 
 # --- 1. host package ---------------------------------------------------------
-echo "==> host package   -> $NM_DIR/dsh-web-search-ollama"
-mkdir -p "$NM_DIR/dsh-web-search-ollama"
-cp "$HOST_PKG/index.js"       "$NM_DIR/dsh-web-search-ollama/index.js"
-cp "$HOST_PKG/package.json"   "$NM_DIR/dsh-web-search-ollama/package.json"
-cp "$HOST_PKG/cordis.patch.yml" "$NM_DIR/dsh-web-search-ollama/cordis.patch.yml"
+echo "==> host package   -> $HOST_DST"
+mkdir -p "$HOST_DST"
+cp "$HOST_PKG/index.js"       "$HOST_DST/index.js"
+cp "$HOST_PKG/package.json"   "$HOST_DST/package.json"
+cp "$HOST_PKG/cordis.patch.yml" "$HOST_DST/cordis.patch.yml"
 
 # --- 2. browser half (the Plugins page configure control) -------------------
-echo "==> client package -> $NM_DIR/dsh-web-search-ollama-client"
-mkdir -p "$NM_DIR/dsh-web-search-ollama-client"
-cp "$CLIENT_PKG/index.js"       "$NM_DIR/dsh-web-search-ollama-client/index.js"
-cp "$CLIENT_PKG/client.js"      "$NM_DIR/dsh-web-search-ollama-client/client.js"
-cp "$CLIENT_PKG/package.json"   "$NM_DIR/dsh-web-search-ollama-client/package.json"
-cp "$CLIENT_PKG/cordis.patch.yml" "$NM_DIR/dsh-web-search-ollama-client/cordis.patch.yml"
+echo "==> client package -> $CLIENT_DST"
+mkdir -p "$CLIENT_DST"
+cp "$CLIENT_PKG/index.js"       "$CLIENT_DST/index.js"
+cp "$CLIENT_PKG/client.js"      "$CLIENT_DST/client.js"
+cp "$CLIENT_PKG/package.json"   "$CLIENT_DST/package.json"
+cp "$CLIENT_PKG/cordis.patch.yml" "$CLIENT_DST/cordis.patch.yml"
 
 # --- 3. loader patch (cordis.patch.yml) --------------------------------------
 echo "==> loader patch    -> $PROFILE_DIR/cordis.patch.yml"
@@ -154,7 +157,7 @@ fi
 
 echo
 echo "==> Done. Restart dsh web (or hot-reload the patch), then configure:"
-echo "    侧边栏 Plugins → 组合包 dsh-web-search-ollama → 行 web-search-ollama → 配置"
+echo "    侧边栏 Plugins → 组合包 @jlvncn/dsh-web-search-ollama → 行 web-search-ollama → 配置"
 echo
 echo "    Verify the loader picked both halves up:"
 echo "    curl -s -X POST http://127.0.0.1:3080/api/pluginInventory/list \\"
