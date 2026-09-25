@@ -2,6 +2,19 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [0.1.13] - 2026-09-25
+
+**CI 发布通道升级为 npm trusted publishing**（免 token 的 OIDC 认证）。npm 官方将于 2027 年 1 月移除 bypass-2FA token 的直接发布，本版本起 Release 触发的 `npm-publish` job 不再依赖任何长期凭证。
+
+### Changed
+
+- `npm-publish` job：node 24 + npm@11（trusted publishing 要求 npm ≥ 11.5.1，node 22 自带 npm 10 不满足）；`NPM_TOKEN` secret 存在时仍优先走 token（过渡期兜底），不存在时走 trusted publishing（需在两个包的 npmjs.com Settings 页各配置一次 Trusted Publisher：GitHub Actions / `jlvncn` / `dsh-web-search-ollama` / `ci.yml` / 空 environment——已配置）。
+- 发布幂等：目标版本已在 registry 上则跳过，重跑 job 或本地先发过（如 0.1.12）都不会让 job 变红。
+
+### Notes
+
+- 0.1.12 因 granular token 对"新包首发"的权限伪装 404（npm 对新 scoped 包的 401/403 一律回 404 防探测）改为本地发布，无 provenance 徽章；**0.1.13 是第一个由 CI 带 provenance 发布的版本**（trusted publishing 自动附带）。
+
 ## [0.1.12] - 2026-09-25
 
 **npm 包改名为 scoped 名**：`dsh-web-search-ollama` → **`@jlvncn/dsh-web-search-ollama`**，`dsh-web-search-ollama-client` → **`@jlvncn/dsh-web-search-ollama-client`**。原因：无 scope 的原包名已于 2026-08-25 被第三方（npm 用户 `sryimnoob`，仓库 `sryimnoob123/dsh-web-search-ollama`，非 fork）抢注发布——该包借鉴了本项目 v0.1.1 的自创错误码（`WEB_PROVIDER_CREDENTIAL_MISSING`）与 `apiKeyEnv` 字段名但无任何署名，代码为独立重写，且其 peerDependencies 死锁 `0.1.1-rc.2`、在 dsh ≥ 0.1.2 上会被组合期校验拒绝。scope 与 npm 账号绑定、不可被抢注，改名后本项目可正式发布到 npm registry（第四条安装通道）。
@@ -222,6 +235,7 @@ v0.1.6 的后续补丁：**停用浏览器半**。宿主半在 0.1.7 下已正�
 - 默认联网搜索从内置 DeepSeek 搜索切换到 Ollama 云端（需配置 `OLLAMA_API_KEY`；内置 `web-search-deepseek` 默认停用）。
 - host 插件由本地文件加载改为正式 npm 包 `dsh-web-search-ollama`（peerDependencies：`dsh-settings`、`dsh-web`；dependencies：`schemastery`）。
 
+[0.1.13]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.13
 [0.1.12]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.12
 [0.1.11]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.11
 [0.1.10]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.10

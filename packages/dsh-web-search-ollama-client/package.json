@@ -1,6 +1,6 @@
 {
   "name": "@jlvncn/dsh-web-search-ollama-client",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "description": "Browser half for @jlvncn/dsh-web-search-ollama: registers the plugin row's configuration card on the DeepSeek Harness Web UI Plugins page",
   "type": "module",
   "main": "index.js",

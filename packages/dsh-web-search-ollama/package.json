@@ -1,6 +1,6 @@
 {
   "name": "@jlvncn/dsh-web-search-ollama",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "description": "Ollama-backed search & fetch provider for the DeepSeek Harness `ctx.web` seam (host half of the web-search-ollama plugin)",
   "type": "module",
   "engines": {
