@@ -14,10 +14,14 @@
 #                   the README's tarball install channel always has
 #                   current assets (`dsh plugin add <release .tgz URL>`).
 #
-#   npm-publish   — when a GitHub Release is published AND the NPM_TOKEN
-#                   repository secret exists: publish both scoped packages
-#                   (@jlvncn/…) to npmjs.org with provenance (OIDC).
-#                   Skipped silently when no token is configured.
+#   npm-publish   — when a GitHub Release is published: publish both scoped
+#                   packages (@jlvncn/…) to npmjs.org with provenance.
+#                   Auth: npm trusted publishing (OIDC, token-free — the
+#                   recommended path; configure it on each package's npmjs
+#                   Settings page) or, as a fallback, the NPM_TOKEN
+#                   repository secret when present. Versions that are
+#                   already on the registry are skipped, so re-runs and
+#                   local publishes don't fail the job.
 name: CI
 
 on:
@@ -94,7 +98,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write # npm provenance (OIDC)
+      id-token: write # npm provenance + trusted publishing (OIDC)
     steps:
       - uses: actions/checkout@v5
         with:
@@ -104,25 +108,43 @@ jobs:
 
       - uses: actions/setup-node@v5
         with:
-          node-version: 22
+          # npm trusted publishing needs npm >= 11.5.1; node 22 ships npm 10.
+          node-version: 24
           registry-url: https://registry.npmjs.org
           cache: pnpm
+
+      - name: Ensure npm >= 11.5.1
+        run: |
+          npm --version
+          npm install --global npm@11 --silent
+          npm --version
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Publish both packages (skipped without NPM_TOKEN)
+      - name: Publish both packages (trusted publishing, or NPM_TOKEN fallback)
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          if [ -z "$NPM_TOKEN" ]; then
-            echo "NPM_TOKEN secret not configured — skipping npm publish."
-            echo "(Publish locally with 'npm publish', or add a granular"
-            echo " publish token as the NPM_TOKEN repository secret.)"
-            exit 0
+          set -euo pipefail
+          if [ -n "$NPM_TOKEN" ]; then
+            echo "::notice::Authenticating with the NPM_TOKEN secret."
+            echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" >> "$HOME/.npmrc"
+          else
+            echo "::notice::No NPM_TOKEN — using npm trusted publishing (OIDC)."
+            echo "If this fails with an auth error, add a Trusted Publisher"
+            echo "(GitHub Actions / jlvncn / dsh-web-search-ollama / ci.yml,"
+            echo "empty environment) on each package's npmjs.com Settings page."
           fi
-          echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" >> "$HOME/.npmrc"
-          cd packages/dsh-web-search-ollama
-          npm publish --provenance --access public
-          cd ../dsh-web-search-ollama-client
-          npm publish --provenance --access public
+          publish_one() { # $1 = package dir, $2 = package name
+            local ver
+            ver=$(node -p "require('./packages/$1/package.json').version")
+            if npm view "$2@$ver" version >/dev/null 2>&1; then
+              echo "$2@$ver is already on the registry — skipping."
+              return 0
+            fi
+            echo "Publishing $2@$ver …"
+            (cd "packages/$1" && npm publish --provenance --access public)
+          }
+          publish_one dsh-web-search-ollama @jlvncn/dsh-web-search-ollama
+          publish_one dsh-web-search-ollama-client @jlvncn/dsh-web-search-ollama-client
