@@ -1,5 +1,7 @@
 # 官方约定审核（dsh-web-search-ollama）
 
+> **状态批注（2026-09-25 追加）**：本文是 2026-09-24 / v0.1.8 时点的审核快照，正文保持原样不回改。此后有两处演进：① 浏览器半并未如本文"已停用"结论所述长期缺位——v0.1.11 起按 0.1.7 契约（键值插槽 `plugins.row.config`）重写并重新挂载；② v0.1.12 起两个 npm 包改名为 `@jlvncn/` scope（原无 scope 包名被第三方抢注）。当前事实以根 [README](../README.md) 与 [CHANGELOG](../CHANGELOG.md) 为准。
+
 - 审核日期：2026-09-24（对应发布 v0.1.8）
 - 依据（上游公开仓库 `github.com/deepseek-ai/deepseek-harness`，master）：
   - `docs/cookbook/adding-a-settings-card.md` —— 实时配置表单的官方写法

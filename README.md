@@ -12,7 +12,7 @@ Ollama 云端搜索 / 抓取插件，用于 [DeepSeek Harness](https://github.co
 - 📦 **零构建**：宿主包为纯 JS（`tsc` 产物入库），装上即用。
 - ♻️ **热重载**：改 `cordis.patch.yml` 后 loader 自动 diff 重新加载；配置表单保存由 settings 服务即时下发。
 
-## 架构：宿主半 + （已停用的）浏览器半
+## 架构：宿主半 + 浏览器半
 
 本插件拆成两个 npm 包：
 
@@ -26,22 +26,31 @@ Ollama 云端搜索 / 抓取插件，用于 [DeepSeek Harness](https://github.co
 ## 目录结构
 
 ```
-dsh-web-search-ollama/
-├── README.md                     # 本文档
-├── LICENSE                       # MIT
-├── package.json                  # monorepo 根（pnpm workspaces）
+dsh-web-search-ollama/                  # 仓库名（npm 包名已是 @jlvncn/… scope，仓库名不变）
+├── README.md                           # 本文档
+├── CHANGELOG.md                        # 版本记录（Keep a Changelog，中文）
+├── UPGRADE_EVALUATION_GUIDE.md         # DSH 升级兼容性评估方法论
+├── LICENSE                             # MIT
+├── package.json                        # monorepo 根（pnpm workspaces）
 ├── pnpm-workspace.yaml
+├── .github/workflows/ci.yml            # CI：test / release-tgz / npm-publish
+├── docs/                               # 历史审核与影响分析快照（带日期，不回改）
 ├── scripts/
-│   └── install.sh                # 一键安装到 DSH profile
+│   └── install.sh                      # 一键安装到 DSH profile（scoped 布局）
 ├── profile/
-│   └── cordis.patch.yml          # loader patch 示例（可复制/自动合并）
+│   └── cordis.patch.yml                # loader patch 示例（可复制/自动合并）
 └── packages/
-    ├── dsh-web-search-ollama/          # host 包
+    ├── dsh-web-search-ollama/          # host 包 = @jlvncn/dsh-web-search-ollama
     │   ├── package.json
-    │   ├── index.js                    # 插件本体（搜索/抓取 provider）
-    │   └── test.mjs                    # 模块形状测试
-    └── dsh-web-search-ollama-client/   # client 包（bundle + dsh.client；0.1.7 契约）
+    │   ├── cordis.patch.yml            # bundle patch（insert 行 web-search-ollama）
+    │   ├── src/index.ts                # TypeScript 源码
+    │   ├── index.js                    # tsc 构建产物（入库，包零构建发布）
+    │   ├── test.mjs                    # 模块形状测试
+    │   ├── test-providers.mjs          # provider 行为测试
+    │   └── tsconfig.json
+    └── dsh-web-search-ollama-client/   # client 包 = @jlvncn/dsh-web-search-ollama-client
         ├── package.json
+        ├── cordis.patch.yml            # bundle patch（insert 行 web-search-ollama-client）
         ├── index.js                    # host half（空 apply，仅占位）
         └── client.js                   # 浏览器 bundle：注册 plugins.row.config + 表单
 ```
@@ -226,6 +235,25 @@ pnpm test             # 模块形状测试 + provider 行为测试（test.mjs + 
 ```
 
 改动 host 包源码 `packages/dsh-web-search-ollama/src/index.ts` 后，运行 `pnpm build`（= `npm run build --prefix packages/dsh-web-search-ollama`）重建 `index.js`，再运行 `./scripts/install.sh` 同步到 profile（或手动 `cp` 到 `$DSH_HOME/profiles/node_modules/@jlvncn/dsh-web-search-ollama/`）。CI 会对每次 push 校验 `index.js` 与 `src` 构建产物一致。
+
+### 发布流程（CI 自动发布 npm）
+
+发布新版本只有三步，其余全部由 CI 完成：
+
+1. **改版本号**：三处 `package.json`（根 + 两包）的 `version` 改为同一新版本；`CHANGELOG.md` 顶部加条目（Keep a Changelog，中文），底部补该版本的链接引用。
+2. **提交并打 tag**：`git commit` → `git tag vX.Y.Z` → `git push origin main vX.Y.Z`。push 触发 `test` job（测试 + `index.js` 构建一致性校验）。
+3. **发 Release**：`gh release create vX.Y.Z`（或网页发布）。release 事件并行触发：
+   - `release-tgz`：打包双包并把 `.tgz` 自动附挂到 Release（README 的 tarball 安装通道）；
+   - `npm-publish`：以 **npm trusted publishing**（OIDC，免 token）把双包发布到 npmjs.org，**自动附带 SLSA provenance**；registry 上已存在的版本自动跳过（幂等，重跑 job 或先本地发过都不会报错）。
+
+**Trusted Publisher 配置**（一次性，每包各一次，v0.1.13 起已配好）：npmjs.com 包页面 → Settings → Trusted Publisher → GitHub Actions，四字段填 `jlvncn` / `dsh-web-search-ollama` / `ci.yml`、Environment 留空。
+
+注意事项：
+
+- `NPM_TOKEN` secret 仅作过渡兜底：存在则优先用 token，不存在（推荐状态）走 trusted publishing。npm 将于 **2027 年 1 月**移除 bypass-2FA token 的直接发布，token 不是长期路径。
+- 本机 `~/.npmrc` 的默认 registry 不影响发布：两包 `publishConfig.registry` 已钉死官方源。
+- npmmirror 会在发布后自动同步；也可手动触发：`curl -X PUT https://registry-direct.npmmirror.com/-/package/<包名>/syncs`。
+- 新包/新版本刚发布后官方源可能有几分钟 CDN 传播延迟，立刻 GET 到 404 属正常，稍等复查即可（npm 对新 scoped 包的权限拒绝也返回 404，两者要靠 `npm publish` 的 PUT 是否 200 区分）。
 
 ### 官方约定对照（插件作者）
 
