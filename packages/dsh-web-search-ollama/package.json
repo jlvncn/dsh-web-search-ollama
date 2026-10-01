@@ -49,7 +49,7 @@
     "prepare": "npm run build"
   },
   "peerDependencies": {
-    "@deepseek-ai/dsh-web": ">=0.1.7-rc.1 <0.2.0"
+    "@deepseek-ai/dsh-web": ">=0.1.7-rc.1 <0.3.0"
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "~3.18.4"
