@@ -2,6 +2,32 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [Unreleased]
+
+**发版闸门**：0.1.14 事故（见该条 Notes）之后，release 路径不再允许"不跑测试直接打包发布"。
+
+### Added
+
+- `scripts/check-release-consistency.mjs`：断言 Release tag 等于三处 `package.json` 的 `version`，且 `CHANGELOG.md` 同时具备 `## [X.Y.Z]` 段落与底部链接引用。任一项不满足即拒绝发布。
+- CI `verify-release` job（release 事件触发）：版本一致性校验 → `pnpm install --frozen-lockfile` → `pnpm test` → 提交产物与 `tsc` 输出的同步校验。`release-tgz` 与 `npm-publish` 都声明 `needs: verify-release`，守卫不通过时两者直接跳过——不打包、不发布、不附挂资产。
+
+### Fixed
+
+- 根 `package.json` 的 `version` 与两个发布包对齐（此前滞留在 0.1.13，形成三处版本漂移）。
+
+## [0.1.15] - 2026-10-01
+
+**peer 依赖放宽到 DSH 0.2.x**：`@deepseek-ai/dsh-web` 的 peer 范围由 `>=0.1.7-rc.1 <0.2.0` 改为 `>=0.1.7-rc.1 <0.3.0`，以适配官方 0.2.0 系列（0.2.0-rc.1 / rc.2 已发布；web seam 契约自 0.1.7-rc.2 起无实质变更）。
+
+### Changed
+
+- `@deepseek-ai/dsh-web` peerDependencies 上界 `<0.2.0` → `<0.3.0`（host 包）；`pnpm-lock.yaml` 同步刷新。
+
+### Notes
+
+- **0.1.14 从未发布到 npm**。该 tag 指向的提交只改了 `package.json` 的 peer 范围、未同步 `pnpm-lock.yaml`：push 触发的 `test` 失败，而当时的 release 路径不跑任何测试，于是 `release-tgz` 与 `npm-publish` 双双卡在 `pnpm install --frozen-lockfile`（`ERR_PNPM_OUTDATED_LOCKFILE`）。GitHub Release 虽已建立却没有任何资产，形成指向"registry 上不存在的版本"的悬空 Release。事后处理：删除该 Release 与 tag，版本号跳到 0.1.15，并补上本文件顶部的发版闸门。
+- 0.1.15 由 CI 以 trusted publishing（OIDC）附带 provenance 发布，两个包均已上架。
+
 ## [0.1.13] - 2026-09-25
 
 **CI 发布通道升级为 npm trusted publishing**（免 token 的 OIDC 认证）。npm 官方将于 2027 年 1 月移除 bypass-2FA token 的直接发布，本版本起 Release 触发的 `npm-publish` job 不再依赖任何长期凭证。
@@ -235,6 +261,8 @@ v0.1.6 的后续补丁：**停用浏览器半**。宿主半在 0.1.7 下已正�
 - 默认联网搜索从内置 DeepSeek 搜索切换到 Ollama 云端（需配置 `OLLAMA_API_KEY`；内置 `web-search-deepseek` 默认停用）。
 - host 插件由本地文件加载改为正式 npm 包 `dsh-web-search-ollama`（peerDependencies：`dsh-settings`、`dsh-web`；dependencies：`schemastery`）。
 
+[Unreleased]: https://github.com/jlvncn/dsh-web-search-ollama/compare/v0.1.15...HEAD
+[0.1.15]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.15
 [0.1.13]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.13
 [0.1.12]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.12
 [0.1.11]: https://github.com/jlvncn/dsh-web-search-ollama/releases/tag/v0.1.11

@@ -1,27 +1,38 @@
 # CI for the dsh-web-search-ollama monorepo.
 #
-# Three independent jobs:
+# Four jobs. Both release jobs are gated by `needs: verify-release`, so a
+# Release whose tag disagrees with the manifests, whose CHANGELOG entry is
+# missing, whose lockfile is stale, or whose tests fail publishes nothing and
+# attaches no tarballs.
 #
-#   test          — on every push to main and every pull request:
-#                   install (frozen lockfile), run the module-shape and
-#                   provider-behavior tests, then rebuild the host package
-#                   with tsc and fail if the committed index.js differs
-#                   (the compiled output is checked in on purpose: the
-#                   package ships zero-build).
+#   test           — on every push to main and every pull request:
+#                    install (frozen lockfile), run the module-shape and
+#                    provider-behavior tests, then rebuild the host package
+#                    with tsc and fail if the committed index.js differs
+#                    (the compiled output is checked in on purpose: the
+#                    package ships zero-build).
 #
-#   release-tgz   — when a GitHub Release is published: pack both npm
-#                   packages and attach the tarballs to that Release, so
-#                   the README's tarball install channel always has
-#                   current assets (`dsh plugin add <release .tgz URL>`).
+#   verify-release — when a GitHub Release is published: assert the release tag
+#                    equals every manifest version and has a CHANGELOG entry,
+#                    install with the frozen lockfile, run the same tests, and
+#                    re-check the committed build. This is the gate the
+#                    v0.1.14 incident was missing: the release path used to run
+#                    no tests at all, so a stale lockfile could reach the
+#                    publish jobs and leave a Release with no version on npm.
 #
-#   npm-publish   — when a GitHub Release is published: publish both scoped
-#                   packages (@jlvncn/…) to npmjs.org with provenance.
-#                   Auth: npm trusted publishing (OIDC, token-free — the
-#                   recommended path; configure it on each package's npmjs
-#                   Settings page) or, as a fallback, the NPM_TOKEN
-#                   repository secret when present. Versions that are
-#                   already on the registry are skipped, so re-runs and
-#                   local publishes don't fail the job.
+#   release-tgz    — when a GitHub Release is published: pack both npm
+#                    packages and attach the tarballs to that Release, so
+#                    the README's tarball install channel always has
+#                    current assets (`dsh plugin add <release .tgz URL>`).
+#
+#   npm-publish    — when a GitHub Release is published: publish both scoped
+#                    packages (@jlvncn/…) to npmjs.org with provenance.
+#                    Auth: npm trusted publishing (OIDC, token-free — the
+#                    recommended path; configure it on each package's npmjs
+#                    Settings page) or, as a fallback, the NPM_TOKEN
+#                    repository secret when present. Versions that are
+#                    already on the registry are skipped, so re-runs and
+#                    local publishes don't fail the job.
 name: CI
 
 on:
@@ -61,7 +72,44 @@ jobs:
           pnpm build
           git diff --exit-code packages/dsh-web-search-ollama/index.js
 
+  verify-release:
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      # Reads JSON and Markdown only — runs before any install so a tag that
+      # disagrees with the manifests fails in seconds.
+      - name: Release consistency (tag == manifests, CHANGELOG entry present)
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: node scripts/check-release-consistency.mjs
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # A stale pnpm-lock.yaml fails here, before anything is packed or
+      # published — this is the check that caught the v0.1.14 drift, moved to
+      # the front of the release path.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Test (module shape + provider behavior)
+        run: pnpm test
+
+      - name: Build sync check (committed index.js == tsc output)
+        run: |
+          pnpm build
+          git diff --exit-code packages/dsh-web-search-ollama/index.js
+
   release-tgz:
+    needs: verify-release
     if: github.event_name == 'release'
     runs-on: ubuntu-latest
     permissions:
@@ -94,6 +142,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   npm-publish:
+    needs: verify-release
     if: github.event_name == 'release'
     runs-on: ubuntu-latest
     permissions:
