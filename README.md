@@ -33,7 +33,7 @@ dsh-web-search-ollama/                  # 仓库名（npm 包名已是 @jlvncn/�
 ├── LICENSE                             # MIT
 ├── package.json                        # monorepo 根（pnpm workspaces）
 ├── pnpm-workspace.yaml
-├── .github/workflows/ci.yml            # CI：test / release-tgz / npm-publish
+├── .github/workflows/ci.yml            # CI：test / verify-release / release-tgz / npm-publish
 ├── docs/                               # 历史审核与影响分析快照（带日期，不回改）
 ├── scripts/
 │   └── install.sh                      # 一键安装到 DSH profile（scoped 布局）
@@ -240,16 +240,20 @@ pnpm test             # 模块形状测试 + provider 行为测试（test.mjs + 
 
 发布新版本只有三步，其余全部由 CI 完成：
 
-1. **改版本号**：三处 `package.json`（根 + 两包）的 `version` 改为同一新版本；`CHANGELOG.md` 顶部加条目（Keep a Changelog，中文），底部补该版本的链接引用。
+1. **改版本号**：三处 `package.json`（根 + 两包）的 `version` 改为同一新版本；`CHANGELOG.md` 顶部加条目（Keep a Changelog，中文），底部补该版本的链接引用。这三项都是硬性要求——漏掉任何一处，下面的 `verify-release` 闸门会直接拒绝发布。
 2. **提交并打 tag**：`git commit` → `git tag vX.Y.Z` → `git push origin main vX.Y.Z`。push 触发 `test` job（测试 + `index.js` 构建一致性校验）。
-3. **发 Release**：`gh release create vX.Y.Z`（或网页发布）。release 事件并行触发：
+3. **发 Release**：`gh release create vX.Y.Z`（或网页发布）。release 事件先过闸门、再并行打包与发布：
+   - `verify-release`（**闸门**）：校验 tag 等于三处 `version`、`CHANGELOG.md` 有对应段落与底部链接，随后 `pnpm install --frozen-lockfile`（lockfile 漂移在这里被拦截）、`pnpm test`、提交产物与 `tsc` 输出一致性；
    - `release-tgz`：打包双包并把 `.tgz` 自动附挂到 Release（README 的 tarball 安装通道）；
    - `npm-publish`：以 **npm trusted publishing**（OIDC，免 token）把双包发布到 npmjs.org，**自动附带 SLSA provenance**；registry 上已存在的版本自动跳过（幂等，重跑 job 或先本地发过都不会报错）。
+
+两个发布 job 都声明了 `needs: verify-release`，闸门失败时它们直接跳过——不打包、不发布、不附挂资产，不会留下悬空 Release。
 
 **Trusted Publisher 配置**（一次性，每包各一次，v0.1.13 起已配好）：npmjs.com 包页面 → Settings → Trusted Publisher → GitHub Actions，四字段填 `jlvncn` / `dsh-web-search-ollama` / `ci.yml`、Environment 留空。
 
 注意事项：
 
+- **发版闸门**是 0.1.14 事故的产物：该 tag 的提交改了 `package.json` 却没同步 `pnpm-lock.yaml`，push 的 `test` 失败，而当时的 release 路径不跑测试，两个发布 job 都卡在 `--frozen-lockfile`，最终留下一个没有任何资产的悬空 Release。现在 release 路径先跑 `verify-release`，任何一项不一致都在发布前失败。本地可复现同一校验：`RELEASE_TAG=vX.Y.Z node scripts/check-release-consistency.mjs`。
 - `NPM_TOKEN` secret 仅作过渡兜底：存在则优先用 token，不存在（推荐状态）走 trusted publishing。npm 将于 **2027 年 1 月**移除 bypass-2FA token 的直接发布，token 不是长期路径。
 - 本机 `~/.npmrc` 的默认 registry 不影响发布：两包 `publishConfig.registry` 已钉死官方源。
 - npmmirror 会在发布后自动同步；也可手动触发：`curl -X PUT https://registry-direct.npmmirror.com/-/package/<包名>/syncs`。
