@@ -11,7 +11,7 @@ importers:
   packages/dsh-web-search-ollama:
     dependencies:
       '@deepseek-ai/dsh-web':
-        specifier: '>=0.1.7-rc.1 <0.2.0'
+        specifier: '>=0.1.7-rc.1 <0.3.0'
         version: 0.1.7-rc.1(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-llm@0.1.7-rc.1(@deepseek-ai/cordis@4.0.4))
       '@deepseek-ai/schemastery':
         specifier: ~3.18.4
